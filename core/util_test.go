@@ -1,8 +1,6 @@
 package core
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -82,30 +80,28 @@ type DrandTestScenario struct {
 	// and new nodes. These are the one that should appear in the newGroup
 	resharedNodes []*MockNode
 
-	// used to write logs to different outputs
-	logBuffers []*logBuffer
+	// the different beacon processes launched during the test
+	drands   []*BeaconProcess
+
+	// used to write logs to files
+	logFiles []*logFile
 }
 
-type logBuffer struct {
-	*bufio.Writer
-	buf *bytes.Buffer
+type logFile struct {
+	*os.File
 }
 
-func newLogBuffer() *logBuffer {
-	var buf bytes.Buffer
-	return &logBuffer{
-		Writer: bufio.NewWriter(&buf),
-		buf:    &buf,
+func newLogFile(t *testing.T, filename string) *logFile {
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	require.NoError(t, err)
+	return &logFile{
+		File: file,
 	}
 }
 
-func (lb *logBuffer) cleanup(t *testing.T, filename string) {
-	err := lb.Flush()
-	require.NoError(t, err)
-
-	t.Log(lb.buf.String())
-	err = os.WriteFile(filename, lb.buf.Bytes(), 0o644)
-	require.NoError(t, err)
+func (lb *logFile) Close(t *testing.T, i int) {
+	require.NoError(t, lb.File.Close())
+	t.Logf("wrote server %d log file at %s\n", i, lb.File.Name())
 }
 
 // BatchNewDrand returns n drands, using TLS or not, with the given
@@ -117,7 +113,7 @@ func (lb *logBuffer) cleanup(t *testing.T, filename string) {
 //
 //nolint:funlen
 func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beaconID string, opts ...ConfigOption) (
-	daemons []*DrandDaemon, drands []*BeaconProcess, group *key.Group, dir string, certPaths []string, lBuffers []*logBuffer,
+	daemons []*DrandDaemon, drands []*BeaconProcess, group *key.Group, dir string, certPaths []string, lBuffers []*logFile,
 ) {
 	t.Logf("Creating %d nodes for beaconID %s", n, beaconID)
 	var privs []*key.Pair
@@ -182,7 +178,7 @@ func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beacon
 		logLevel = log.LogDebug
 	}
 
-	var logBuffers []*logBuffer
+	var logFiles []*logFile
 
 	for i := 0; i < n; i++ {
 		s := test.NewKeyStore()
@@ -202,8 +198,9 @@ func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beacon
 
 		loggingOption := WithLogLevel(logLevel, false)
 		if logToFile {
-			logger := newLogBuffer()
-			logBuffers = append(logBuffers, logger)
+			fileName := path.Join(dir, fmt.Sprintf("server-log-%d.log", len(logFiles)))
+			logger := newLogFile(t, fileName)
+			logFiles = append(logFiles, logger)
 			loggingOption = WithOutputAndLogLevel(logger, logLevel, true)
 		}
 
@@ -226,7 +223,7 @@ func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beacon
 		drands[i] = bp
 	}
 
-	return daemons, drands, group, dir, certPaths, logBuffers
+	return daemons, drands, group, dir, certPaths, logFiles
 }
 
 // CloseAllDrands closes all drands
@@ -255,13 +252,14 @@ func NewDrandTestScenario(t *testing.T, n, thr int, period time.Duration, sch sc
 	dt := new(DrandTestScenario)
 	beaconID = common.GetCanonicalBeaconID(beaconID)
 
-	daemons, drands, _, dir, certPaths, logBuffers := BatchNewDrand(
+	daemons, drands, _, dir, certPaths, logFiles := BatchNewDrand(
 		t, n, false, sch, beaconID, WithCallOption(grpc.WaitForReady(true)),
 	)
 
 	dt.dir = dir
 	dt.certPaths = certPaths
-	dt.logBuffers = logBuffers
+	dt.logFiles = logFiles
+	dt.drands = drands
 	dt.groupPath = path.Join(dt.dir, "group.toml")
 	dt.n = n
 	dt.scheme = sch
@@ -395,8 +393,8 @@ func (d *DrandTestScenario) RunDKG(t *testing.T) *key.Group {
 }
 
 func (d *DrandTestScenario) Cleanup(t *testing.T) {
-	if len(d.logBuffers) != 0 {
-		cleanupLogBuffers(t, d.logBuffers, d.dir)
+	if len(d.logFiles) != 0 {
+		closeLogFiles(t, d.logFiles, d.dir)
 		return
 	}
 
@@ -409,11 +407,9 @@ func (d *DrandTestScenario) Cleanup(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func cleanupLogBuffers(t *testing.T, logBuffers []*logBuffer, dir string) {
-	for i := 0; i < len(logBuffers); i++ {
-		fileName := path.Join(dir, fmt.Sprintf("server-log-%d.log", i))
-		logBuffers[i].cleanup(t, fileName)
-		t.Logf("wrote server %d log file at %s\n", i, fileName)
+func closeLogFiles(t *testing.T, logFiles []*logFile, dir string) {
+	for i := 0; i < len(logFiles); i++ {
+		logFiles[i].Close(t, i)
 	}
 }
 
@@ -443,7 +439,7 @@ func (d *DrandTestScenario) GetMockNode(t *testing.T, nodeAddress string, newGro
 	var result *MockNode
 	for _, node := range nodes {
 		if node.addr == nodeAddress {
-			result= node
+			result = node
 			break
 		}
 	}
@@ -547,9 +543,10 @@ func (d *DrandTestScenario) CheckPublicBeacon(t *testing.T, nodeAddress string, 
 
 // SetupNewNodes creates new additional nodes that can participate during the resharing
 func (d *DrandTestScenario) SetupNewNodes(t *testing.T, newNodes int) []*MockNode {
-	newDaemons, newDrands, _, newDir, newCertPaths, logBuffers := BatchNewDrand(t, newNodes, false, d.scheme, d.beaconID,
+	newDaemons, newDrands, _, newDir, newCertPaths, logFiles := BatchNewDrand(t, newNodes, false, d.scheme, d.beaconID,
 		WithCallOption(grpc.WaitForReady(false)))
-	d.logBuffers = append(d.logBuffers, logBuffers...)
+	d.logFiles = append(d.logFiles, logFiles...)
+	d.drands = append(d.drands, newDrands...)
 	d.newCertPaths = newCertPaths
 	d.newDir = newDir
 	d.newNodes = make([]*MockNode, newNodes)
@@ -872,6 +869,11 @@ func (d *DrandTestScenario) RunReshare(t *testing.T, c *reshareConfig) (*key.Gro
 			}
 		}
 	}
+}
+
+// CloseAllDrands ...
+func (d *DrandTestScenario) CloseAllDrands() {
+	CloseAllDrands(d.drands)
 }
 
 // DenyClient can abort request to other needs based on a peer list

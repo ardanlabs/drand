@@ -2,6 +2,7 @@ package core
 
 import (
 	"io"
+	"os"
 	"path"
 	"time"
 
@@ -261,10 +262,11 @@ func WithLogLevel(level int, jsonFormat bool) ConfigOption {
 // sets the logging verbosity to the given level.
 func WithOutputAndLogLevel(output io.Writer, level int, jsonFormat bool) ConfigOption {
 	return func(d *Config) {
+		mwr := zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), zapcore.AddSync(output))
 		if jsonFormat {
-			d.logger = log.NewJSONLogger(zapcore.AddSync(output), level)
+			d.logger = log.NewJSONLogger(mwr, level)
 		} else {
-			d.logger = log.NewLogger(zapcore.AddSync(output), level)
+			d.logger = log.NewLogger(mwr, level)
 		}
 	}
 }

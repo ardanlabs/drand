@@ -189,6 +189,7 @@ func TestRunDKGBroadcastDeny(t *testing.T) {
 
 	dt := NewDrandTestScenario(t, n, thr, beaconPeriod, sch, beaconID)
 	defer dt.Cleanup(t)
+	defer dt.CloseAllDrands()
 
 	// close connection between a pair of nodes
 	node1 := dt.nodes[1]

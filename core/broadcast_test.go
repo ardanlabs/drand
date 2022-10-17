@@ -67,10 +67,10 @@ func TestBroadcastSet(t *testing.T) {
 func TestBroadcast(t *testing.T) {
 	n := 5
 	sch, beaconID := scheme.GetSchemeFromEnv(), test.GetBeaconIDFromEnv()
-	_, drands, group, dir, _, logBuffers := BatchNewDrand(t, n, true, sch, beaconID)
+	_, drands, group, dir, _, logFiles := BatchNewDrand(t, n, true, sch, beaconID)
 	defer func() {
-		if len(logBuffers) > 0 {
-			cleanupLogBuffers(t, logBuffers, dir)
+		if len(logFiles) > 0 {
+			closeLogFiles(t, logFiles, dir)
 
 			return
 		}
