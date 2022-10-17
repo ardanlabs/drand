@@ -393,6 +393,8 @@ func (d *DrandTestScenario) RunDKG(t *testing.T) *key.Group {
 }
 
 func (d *DrandTestScenario) Cleanup(t *testing.T) {
+	d.CloseAllDaemons()
+
 	if len(d.logFiles) != 0 {
 		closeLogFiles(t, d.logFiles, d.dir)
 		return
@@ -874,6 +876,16 @@ func (d *DrandTestScenario) RunReshare(t *testing.T, c *reshareConfig) (*key.Gro
 // CloseAllDrands ...
 func (d *DrandTestScenario) CloseAllDrands() {
 	CloseAllDrands(d.drands)
+}
+
+// CloseAllDaemons ...
+func (d *DrandTestScenario) CloseAllDaemons() {
+	for i := 0; i < len(d.nodes); i++ {
+		d.nodes[i].daemon.Stop(context.Background())
+	}
+	for i := 0; i < len(d.newNodes); i++ {
+		d.newNodes[i].daemon.Stop(context.Background())
+	}
 }
 
 // DenyClient can abort request to other needs based on a peer list

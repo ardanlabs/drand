@@ -189,7 +189,6 @@ func TestRunDKGBroadcastDeny(t *testing.T) {
 
 	dt := NewDrandTestScenario(t, n, thr, beaconPeriod, sch, beaconID)
 	defer dt.Cleanup(t)
-	defer dt.CloseAllDrands()
 
 	// close connection between a pair of nodes
 	node1 := dt.nodes[1]
@@ -215,6 +214,9 @@ func TestRunDKGBroadcastDeny(t *testing.T) {
 		})
 	require.NoError(t, err)
 	require.NotNil(t, group2)
+
+	t.Logf("group 1: %s\n", group1)
+	t.Logf("group 2: %s\n", group2)
 
 	t.Log("Resharing complete")
 }
