@@ -15,8 +15,8 @@ func TestClientPrivate(t *testing.T) {
 
 	//nolint:dogsled
 	_, drands, _, dir, _ := BatchNewDrand(t, 1, false, sch, beaconID, WithPrivateRandomness())
-	defer CloseAllDrands(drands)
 	defer os.RemoveAll(dir)
+	defer CloseAllDrands(drands)
 
 	pub := drands[0].priv.Public
 	client := NewGrpcClientFromCert(nil, drands[0].opts.certmanager)
