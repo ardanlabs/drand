@@ -1,11 +1,13 @@
 package core
 
 import (
+	"io"
 	"path"
 	"time"
 
 	clock "github.com/jonboulle/clockwork"
 	bolt "go.etcd.io/bbolt"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 
 	"github.com/drand/drand/chain"
@@ -251,6 +253,18 @@ func WithLogLevel(level int, jsonFormat bool) ConfigOption {
 			d.logger = log.NewJSONLogger(nil, level)
 		} else {
 			d.logger = log.NewLogger(nil, level)
+		}
+	}
+}
+
+// WithOutputAndLogLevel writes the logs to the specified file and
+// sets the logging verbosity to the given level.
+func WithOutputAndLogLevel(output io.Writer, level int, jsonFormat bool) ConfigOption {
+	return func(d *Config) {
+		if jsonFormat {
+			d.logger = log.NewJSONLogger(zapcore.AddSync(output), level)
+		} else {
+			d.logger = log.NewLogger(zapcore.AddSync(output), level)
 		}
 	}
 }

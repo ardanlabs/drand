@@ -1,6 +1,8 @@
 package core
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -79,6 +81,31 @@ type DrandTestScenario struct {
 	// nodes that actually ran the resharing phase - it's a combination of nodes
 	// and new nodes. These are the one that should appear in the newGroup
 	resharedNodes []*MockNode
+
+	// used to write logs to different outputs
+	logBuffers []*logBuffer
+}
+
+type logBuffer struct {
+	*bufio.Writer
+	buf *bytes.Buffer
+}
+
+func newLogBuffer() *logBuffer {
+	var buf bytes.Buffer
+	return &logBuffer{
+		Writer: bufio.NewWriter(&buf),
+		buf:    &buf,
+	}
+}
+
+func (lb *logBuffer) cleanup(t *testing.T, filename string) {
+	err := lb.Flush()
+	require.NoError(t, err)
+
+	t.Log(lb.buf.String())
+	err = os.WriteFile(filename, lb.buf.Bytes(), 0o644)
+	require.NoError(t, err)
 }
 
 // BatchNewDrand returns n drands, using TLS or not, with the given
@@ -90,7 +117,7 @@ type DrandTestScenario struct {
 //
 //nolint:funlen
 func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beaconID string, opts ...ConfigOption) (
-	daemons []*DrandDaemon, drands []*BeaconProcess, group *key.Group, dir string, certPaths []string,
+	daemons []*DrandDaemon, drands []*BeaconProcess, group *key.Group, dir string, certPaths []string, lBuffers []*logBuffer,
 ) {
 	t.Logf("Creating %d nodes for beaconID %s", n, beaconID)
 	var privs []*key.Pair
@@ -104,7 +131,16 @@ func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beacon
 	daemons = make([]*DrandDaemon, n)
 	drands = make([]*BeaconProcess, n)
 
-	dir = path.Join(t.TempDir(), common.MultiBeaconFolder)
+	logToFileString, _ := os.LookupEnv("DRAND_TEST_FILE_LOGS")
+	logToFile := logToFileString == "true"
+
+	tempDir := t.TempDir()
+	var err error
+	if logToFile {
+		tempDir, err = os.MkdirTemp(os.TempDir(), fmt.Sprintf("drand-%s-*", t.Name()))
+		require.NoError(t, err)
+	}
+	dir = path.Join(tempDir, common.MultiBeaconFolder)
 
 	certPaths = make([]string, n)
 	keyPaths := make([]string, n)
@@ -113,7 +149,7 @@ func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beacon
 	for i := 0; i < n; i++ {
 		dirs[i] = path.Join(dir, fmt.Sprintf("drand-%d", i))
 		if err := os.MkdirAll(dirs[i], 0o777); err != nil {
-			panic(err)
+			require.NoError(t, err)
 		}
 	}
 
@@ -142,6 +178,8 @@ func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beacon
 		logLevel = log.LogDebug
 	}
 
+	var logBuffers []*logBuffer
+
 	for i := 0; i < n; i++ {
 		s := test.NewKeyStore()
 
@@ -158,9 +196,17 @@ func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beacon
 			confOptions = append(confOptions, WithInsecure())
 		}
 
+		loggingOption := WithLogLevel(logLevel, false)
+		if logToFile {
+			logger := newLogBuffer()
+			logBuffers = append(logBuffers, logger)
+			loggingOption = WithOutputAndLogLevel(logger, logLevel, true)
+		}
+
 		confOptions = append(confOptions,
 			WithControlPort(ports[i]),
-			WithLogLevel(logLevel, false))
+			loggingOption,
+		)
 		// add options in last so it overwrites the default
 		confOptions = append(confOptions, opts...)
 
@@ -176,7 +222,7 @@ func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beacon
 		drands[i] = bp
 	}
 
-	return daemons, drands, group, dir, certPaths
+	return daemons, drands, group, dir, certPaths, logBuffers
 }
 
 // CloseAllDrands closes all drands
@@ -205,12 +251,13 @@ func NewDrandTestScenario(t *testing.T, n, thr int, period time.Duration, sch sc
 	dt := new(DrandTestScenario)
 	beaconID = common.GetCanonicalBeaconID(beaconID)
 
-	daemons, drands, _, dir, certPaths := BatchNewDrand(
+	daemons, drands, _, dir, certPaths, logBuffers := BatchNewDrand(
 		t, n, false, sch, beaconID, WithCallOption(grpc.WaitForReady(true)),
 	)
 
 	dt.dir = dir
 	dt.certPaths = certPaths
+	dt.logBuffers = logBuffers
 	dt.groupPath = path.Join(dt.dir, "group.toml")
 	dt.n = n
 	dt.scheme = sch
@@ -343,9 +390,27 @@ func (d *DrandTestScenario) RunDKG(t *testing.T) *key.Group {
 	return group
 }
 
-func (d *DrandTestScenario) Cleanup() {
-	_ = os.RemoveAll(d.dir)
-	_ = os.RemoveAll(d.newDir)
+func (d *DrandTestScenario) Cleanup(t *testing.T) {
+	if len(d.logBuffers) != 0 {
+		cleanupLogBuffers(t, d.logBuffers, d.dir)
+		return
+	}
+
+	// Do not perform a cleanup of temp dirs if we write logs to files
+	// when using DRAND_TEST_FILE_LOGS=true env var setting
+
+	err := os.RemoveAll(d.dir)
+	require.NoError(t, err)
+	err = os.RemoveAll(d.newDir)
+	require.NoError(t, err)
+}
+
+func cleanupLogBuffers(t *testing.T, logBuffers []*logBuffer, dir string) {
+	for i := 0; i < len(logBuffers); i++ {
+		fileName := path.Join(dir, fmt.Sprintf("server-log-%d.log", i))
+		logBuffers[i].cleanup(t, fileName)
+		t.Logf("wrote server %d log file at %s\n", i, fileName)
+	}
 }
 
 // GetBeacon returns the beacon of the given round for the specified drand id
@@ -365,24 +430,27 @@ func (d *DrandTestScenario) GetBeacon(id string, round int, newGroup bool) (*cha
 
 // GetMockNode returns the node associated with this address, either in the new
 // group or the current group.
-func (d *DrandTestScenario) GetMockNode(nodeAddress string, newGroup bool) *MockNode {
+func (d *DrandTestScenario) GetMockNode(t *testing.T, nodeAddress string, newGroup bool) *MockNode {
 	nodes := d.nodes
 	if newGroup {
 		nodes = d.resharedNodes
 	}
 
+	var result *MockNode
 	for _, node := range nodes {
 		if node.addr == nodeAddress {
-			return node
+			result= node
+			break
 		}
 	}
 
-	panic("no nodes found at this nodeAddress")
+	require.NotNil(t, result)
+	return result
 }
 
 // StopMockNode stops a node from the first group
 func (d *DrandTestScenario) StopMockNode(t *testing.T, nodeAddr string, newGroup bool) {
-	node := d.GetMockNode(nodeAddr, newGroup)
+	node := d.GetMockNode(t, nodeAddr, newGroup)
 
 	dr := node.drand
 	dr.Stop(context.Background())
@@ -413,7 +481,7 @@ func (d *DrandTestScenario) StopMockNode(t *testing.T, nodeAddr string, newGroup
 // StartDrand fetches the drand given the id, in the respective group given the
 // newGroup parameter and runs the beacon
 func (d *DrandTestScenario) StartDrand(t *testing.T, nodeAddress string, catchup, newGroup bool) {
-	node := d.GetMockNode(nodeAddress, newGroup)
+	node := d.GetMockNode(t, nodeAddress, newGroup)
 	dr := node.drand
 
 	t.Logf("[drand] Start")
@@ -462,7 +530,7 @@ func (d *DrandTestScenario) CheckBeaconLength(t *testing.T, nodes []*MockNode, e
 
 // CheckPublicBeacon looks if we can get the latest beacon on this node
 func (d *DrandTestScenario) CheckPublicBeacon(t *testing.T, nodeAddress string, newGroup bool) *drand.PublicRandResponse {
-	node := d.GetMockNode(nodeAddress, newGroup)
+	node := d.GetMockNode(t, nodeAddress, newGroup)
 	dr := node.drand
 
 	client := net.NewGrpcClientFromCertManager(dr.opts.certmanager, dr.opts.grpcOpts...)
@@ -475,8 +543,9 @@ func (d *DrandTestScenario) CheckPublicBeacon(t *testing.T, nodeAddress string, 
 
 // SetupNewNodes creates new additional nodes that can participate during the resharing
 func (d *DrandTestScenario) SetupNewNodes(t *testing.T, newNodes int) []*MockNode {
-	newDaemons, newDrands, _, newDir, newCertPaths := BatchNewDrand(t, newNodes, false, d.scheme, d.beaconID,
+	newDaemons, newDrands, _, newDir, newCertPaths, logBuffers := BatchNewDrand(t, newNodes, false, d.scheme, d.beaconID,
 		WithCallOption(grpc.WaitForReady(false)))
+	d.logBuffers = append(d.logBuffers, logBuffers...)
 	d.newCertPaths = newCertPaths
 	d.newDir = newDir
 	d.newNodes = make([]*MockNode, newNodes)
@@ -578,9 +647,7 @@ func (d *DrandTestScenario) runLeaderReshare(t *testing.T, timeout time.Duration
 	leader := d.nodes[0]
 
 	oldNode := d.group.Find(leader.drand.priv.Public)
-	if oldNode == nil {
-		panic("[reshare:leader] leader not found in old group")
-	}
+	require.NotNil(t, oldNode, "[reshare:leader] leader not found in old group")
 
 	// old root: oldNode.Index leader: leader.addr
 	client, err := net.NewControlClient(leader.drand.opts.controlPort)

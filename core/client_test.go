@@ -14,8 +14,20 @@ func TestClientPrivate(t *testing.T) {
 	sch, beaconID := scheme.GetSchemeFromEnv(), test.GetBeaconIDFromEnv()
 
 	//nolint:dogsled
-	_, drands, _, dir, _ := BatchNewDrand(t, 1, false, sch, beaconID, WithPrivateRandomness())
-	defer os.RemoveAll(dir)
+	_, drands, _, dir, _, logBuffers := BatchNewDrand(t, 1, false, sch, beaconID, WithPrivateRandomness())
+	defer func() {
+		if len(logBuffers) > 0 {
+			cleanupLogBuffers(t, logBuffers, dir)
+
+			return
+		}
+
+		// Do not perform a cleanup of temp dirs if we write logs to files
+		// when using DRAND_TEST_FILE_LOGS=true env var setting
+
+		err := os.RemoveAll(dir)
+		require.NoError(t, err)
+	}()
 	defer CloseAllDrands(drands)
 
 	pub := drands[0].priv.Public
