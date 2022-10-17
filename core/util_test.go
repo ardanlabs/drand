@@ -139,6 +139,10 @@ func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beacon
 	if logToFile {
 		tempDir, err = os.MkdirTemp(os.TempDir(), fmt.Sprintf("drand-%s-*", t.Name()))
 		require.NoError(t, err)
+
+		// When writing the logs to files, want to have a fixed time value to make it easier
+		// to compare the log files
+		opts = append(opts, WithFixedClockLogs())
 	}
 	dir = path.Join(tempDir, common.MultiBeaconFolder)
 

@@ -269,6 +269,14 @@ func WithOutputAndLogLevel(output io.Writer, level int, jsonFormat bool) ConfigO
 	}
 }
 
+// WithFixedClockLogs allows using a fixed date in logs. This makes it easier to compare logs between runs.
+func WithFixedClockLogs() ConfigOption {
+	return func(d *Config) {
+		d.logger = log.FixedTimeLogger(d.logger)
+		d.logger.Info("logging with fixed time is in effect")
+	}
+}
+
 // WithPrivateRandomness enables the private randomness feature on the drand
 // logic. When the feature is not enabled, the call returns an error.
 func WithPrivateRandomness() ConfigOption {
