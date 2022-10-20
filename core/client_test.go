@@ -1,7 +1,6 @@
 package core
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,9 +13,7 @@ func TestClientPrivate(t *testing.T) {
 	sch, beaconID := scheme.GetSchemeFromEnv(), test.GetBeaconIDFromEnv()
 
 	//nolint:dogsled
-	_, drands, _, dir, _ := BatchNewDrand(t, 1, false, sch, beaconID, WithPrivateRandomness())
-	defer CloseAllDrands(drands)
-	defer os.RemoveAll(dir)
+	_, drands, _, _, _ := BatchNewDrand(t, 1, false, sch, beaconID, WithPrivateRandomness())
 
 	pub := drands[0].priv.Public
 	client := NewGrpcClientFromCert(nil, drands[0].opts.certmanager)

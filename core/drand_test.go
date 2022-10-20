@@ -334,7 +334,7 @@ func TestRunDKGReshareAbsentNode(t *testing.T) {
 	leader := 0
 
 	dt.nodes[leader].drand.setupCB = func(g *key.Group) {
-		t.Logf("Stopping node %d \n", nodeIndexToStop)
+		t.Logf("Stopping node for test: %s \n", nodeToStop.addr)
 		nodeToStop.daemon.Stop(context.Background())
 		t.Logf("Node %d stopped \n", nodeIndexToStop)
 	}

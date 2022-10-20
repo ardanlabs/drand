@@ -49,6 +49,7 @@ linters:
     - goerr113
     - gofumpt
     - ifshort
+    - interfacebloat
     - ireturn
     - nestif
     - nlreturn
