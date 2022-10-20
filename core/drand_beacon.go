@@ -367,7 +367,7 @@ func (bp *BeaconProcess) isFreshRun() bool {
 
 	isFresh := errG != nil || errS != nil
 
-	bp.log.Warnw("errors while loading group or share", "error group", errG, "error share", errS, "will run as fresh run", isFresh)
+	bp.log.Debugw("Status when loading group or share", "group error", errG, "share error", errS, "will run as fresh run", isFresh)
 
 	return isFresh
 }
