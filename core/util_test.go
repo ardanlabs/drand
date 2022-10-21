@@ -176,7 +176,7 @@ func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beacon
 
 		// to make sure to stop all daemon after each test
 		t.Cleanup(func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			daemon.Stop(ctx)
 			cancel()
 		})
@@ -605,7 +605,8 @@ func (d *DrandTestScenario) WaitUntilChainIsServing(t *testing.T, node *MockNode
 	}
 }
 
-func (d *DrandTestScenario) runNodeReshare(n *MockNode, errCh chan error, force bool) {
+func (d *DrandTestScenario) runNodeReshare(n *MockNode, errCh chan error, force bool, wg *sync.WaitGroup) {
+	defer wg.Done()
 	secret := "thisistheresharing"
 
 	leader := d.nodes[0]
@@ -753,6 +754,8 @@ func (d *DrandTestScenario) RunReshare(t *testing.T, c *reshareConfig) (*key.Gro
 	}))
 	t.Logf("[DEBUG] node: %s Reshare Status: is in progress", leader.GetAddr())
 
+	wg := new(sync.WaitGroup)
+
 	// run the current nodes
 	for _, node := range d.nodes[1:c.oldRun] {
 		node := node
@@ -760,7 +763,8 @@ func (d *DrandTestScenario) RunReshare(t *testing.T, c *reshareConfig) (*key.Gro
 		if !c.onlyLeader {
 			node.drand.dkgBoardSetup = broadcastSetup
 			d.t.Logf("[reshare] run node reshare %s", node.addr)
-			go d.runNodeReshare(node, errCh, c.force)
+			wg.Add(1)
+			go d.runNodeReshare(node, errCh, c.force, wg)
 		}
 	}
 
@@ -772,7 +776,8 @@ func (d *DrandTestScenario) RunReshare(t *testing.T, c *reshareConfig) (*key.Gro
 			if !c.onlyLeader {
 				node.drand.dkgBoardSetup = broadcastSetup
 				d.t.Logf("[reshare] run node reshare %s (new)", node.addr)
-				go d.runNodeReshare(node, errCh, c.force)
+				wg.Add(1)
+				go d.runNodeReshare(node, errCh, c.force, wg)
 			}
 		}
 	}
@@ -801,6 +806,7 @@ func (d *DrandTestScenario) RunReshare(t *testing.T, c *reshareConfig) (*key.Gro
 			t.Logf("[reshare] Received group!")
 			d.newGroup = finalGroup
 			require.NoError(d.t, key.Save(d.groupPath, d.newGroup, false))
+			wg.Wait()
 			d.t.Logf("[reshare] Finish")
 			return finalGroup, nil
 

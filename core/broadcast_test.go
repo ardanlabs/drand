@@ -97,7 +97,7 @@ func TestBroadcast(t *testing.T) {
 		for i := 0; i < exp; i++ {
 			select {
 			case info := <-incPackets:
-				t.Logf("received packet from %s, %d out of %d", info.id, i, exp)
+				t.Logf("received packet from %s, %d out of %d", info.id, i+1, exp)
 				received[info.id] = true
 			case <-time.After(5 * time.Second):
 				require.True(t, false, "test failed to continue")
