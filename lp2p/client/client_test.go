@@ -76,8 +76,8 @@ func TestGRPCClientTestFunc(t *testing.T) {
 	// for the initial 'get' to sync the chain
 	svc.(mock.MockService).EmitRand(false)
 	ch := c.Watch(ctx)
-	time.Sleep(100 * time.Millisecond)
 	for i := 0; i < 3; i++ {
+		time.Sleep(100 * time.Millisecond)
 		svc.(mock.MockService).EmitRand(false)
 		fmt.Printf("round %d. emitting.\n", i)
 		select {
@@ -87,6 +87,7 @@ func TestGRPCClientTestFunc(t *testing.T) {
 			} else {
 				fmt.Print(r)
 			}
+		// the period of the mock servers is 1 second
 		case <-time.After(10 * time.Second):
 			t.Fatal("timeout.")
 		}
