@@ -220,19 +220,25 @@ func (bp *BeaconProcess) WaitDKG() (*key.Group, error) {
 
 // StartBeacon initializes the beacon if needed and launch a go
 // routine that runs the generation loop.
-func (bp *BeaconProcess) StartBeacon(catchup bool) {
+func (bp *BeaconProcess) StartBeacon(catchup bool) error {
 	b, err := bp.newBeacon()
 	if err != nil {
 		bp.log.Errorw("", "init_beacon", err)
-		return
+		return err
 	}
 
 	bp.log.Infow("", "beacon_start", bp.opts.clock.Now(), "catchup", catchup)
 	if catchup {
 		go b.Catchup()
-	} else if err := b.Start(); err != nil {
+		return nil
+	}
+
+	err = b.Start()
+	if err != nil {
 		bp.log.Errorw("", "beacon_start", err)
 	}
+
+	return err
 }
 
 // transition between an "old" group and a new group. This method is called

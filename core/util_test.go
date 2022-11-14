@@ -458,7 +458,8 @@ func (d *DrandTestScenario) StartDrand(nodeAddress string, catchup, newGroup boo
 	dr := node.drand
 
 	d.t.Logf("[drand] Start")
-	dr.StartBeacon(catchup)
+	err := dr.StartBeacon(catchup)
+	require.NoError(d.t, err)
 	d.t.Logf("[drand] Started")
 }
 
