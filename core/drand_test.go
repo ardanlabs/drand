@@ -883,9 +883,10 @@ func TestDrandFollowChain(t *testing.T) {
 
 	fn := func(upTo, exp uint64) {
 		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		t.Logf(" \t [-] Starting to follow chain with a valid hash. %d <= %d \n", upTo, exp)
-		t.Logf(" \t\t --> beaconID: %s ; hash-chain: %s", beaconID, hash)
+		t.Logf(" \t\t --> beaconID: %s ; hash-chain: %s\n", beaconID, hash)
 		progress, errCh, err := newClient.StartFollowChain(ctx, hash, addrToFollow, tls, upTo, beaconID)
 		require.NoError(t, err)
 
@@ -894,19 +895,19 @@ func TestDrandFollowChain(t *testing.T) {
 			case p, ok := <-progress:
 				t.Logf(" \t\t --> Received progress: %d / %d \n", p.Current, p.Target)
 				if ok && p.Current == exp {
-					t.Logf("\t\t -->Successful beacon rcv. Round: %d.", exp)
+					t.Logf("\t\t -->Successful beacon rcv. Round: %d.\n", exp)
 					goon = false
 				}
 			case e := <-errCh:
 				if errors.Is(e, io.EOF) { // means we've reached the end
-					t.Logf("\t\t -->Got EOF from daemon.")
+					t.Logf("\t\t -->Got EOF from daemon.\n")
 					goon = false
 					break
 				}
-				t.Logf("\t\t -->Unexpected error received: %v.", e)
+				t.Logf("\t\t -->Unexpected error received: %v.\n", e)
 				require.NoError(t, e)
 			case <-time.After(2 * time.Second):
-				t.Fatalf("\t\t --> Timeout during test")
+				t.Fatalf("\t\t --> Timeout during test\n")
 			}
 		}
 
@@ -917,14 +918,15 @@ func TestDrandFollowChain(t *testing.T) {
 
 		// Since the context gets canceled above, we need a fresh one.
 		// We need this context to allow us to check the store values.
-		cx := context.Background()
+		c, cx := context.WithCancel(context.Background())
+		defer cx()
 
 		// check if the beacon is in the database
 		store, err := newNode.drand.createBoltStore()
 		require.NoError(t, err)
-		defer store.Close(cx)
+		defer store.Close(c)
 
-		lastB, err := store.Last(cx)
+		lastB, err := store.Last(c)
 		require.NoError(t, err)
 		require.Equal(t, exp, lastB.Round, "found %d vs expected %d", lastB.Round, exp)
 	}

@@ -5,6 +5,7 @@ import (
 	"io"
 	"path"
 	"sync"
+	"time"
 
 	bolt "go.etcd.io/bbolt"
 
@@ -35,6 +36,20 @@ const BoltStoreOpenPerm = 0660
 
 // NewBoltStore returns a Store implementation using the boltdb storage engine.
 func NewBoltStore(l log.Logger, folder string, opts *bolt.Options) (*BoltStore, error) {
+	if opts == nil {
+		opts = bolt.DefaultOptions
+	}
+	// We need to check the timeout here.
+	// If Bolt cannot open the file, it will stay in a loop until it can or the timeout is reached.
+	// When the timeout is set to 0, it will wait infinitely.
+	// That's why we want to set a reasonable timeout.
+	// If the timeout of 2 seconds is too small, then the storage layer will likely perform poorly
+	// for all other operations too.
+
+	if opts.Timeout == 0 {
+		opts.Timeout = 2 * time.Second
+	}
+
 	dbPath := path.Join(folder, BoltFileName)
 	db, err := bolt.Open(dbPath, BoltStoreOpenPerm, opts)
 	if err != nil {
