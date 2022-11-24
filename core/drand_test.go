@@ -915,12 +915,16 @@ func TestDrandFollowChain(t *testing.T) {
 		// cancel the operation
 		cancel()
 
+		// Since the context gets canceled above, we need a fresh one.
+		// We need this context to allow us to check the store values.
+		cx := context.Background()
+
 		// check if the beacon is in the database
 		store, err := newNode.drand.createBoltStore()
 		require.NoError(t, err)
-		defer store.Close(ctx)
+		defer store.Close(cx)
 
-		lastB, err := store.Last(ctx)
+		lastB, err := store.Last(cx)
 		require.NoError(t, err)
 		require.Equal(t, exp, lastB.Round, "found %d vs expected %d", lastB.Round, exp)
 	}
