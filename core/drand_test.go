@@ -860,79 +860,88 @@ func TestDrandFollowChain(t *testing.T) {
 	hash := fmt.Sprintf("%x", chain.NewChainInfo(group).Hash())
 	tls := true
 
-	// First try with an invalid hash info
-	t.Logf(" \t [-] Trying to follow with an invalid hash\n")
-	ctx, cancel = context.WithCancel(context.Background())
-	_, errCh, _ := newClient.StartFollowChain(ctx, "deadbeef", addrToFollow, tls, 10000, beaconID)
-	expectChanFail(t, errCh)
-	cancel()
-
-	// testing with a non hex hash
-	t.Logf(" \t [-] Trying to follow with a non-hex hash\n")
-	ctx, cancel = context.WithCancel(context.Background())
-	_, _, err = newClient.StartFollowChain(ctx, "tutu", addrToFollow, tls, 10000, beaconID)
-	require.Error(t, err)
-	cancel()
-
-	// testing with a invalid beaconID
-	t.Logf("T \t [-] rying to follow with an invalid beaconID\n")
-	ctx, cancel = context.WithCancel(context.Background())
-	_, errCh, _ = newClient.StartFollowChain(ctx, hash, addrToFollow, tls, 10000, "tutu")
-	expectChanFail(t, errCh)
-	cancel()
-
-	fn := func(upTo, exp uint64) {
-		ctx, cancel := context.WithCancel(context.Background())
+	t.Run("invalid-hash", func(t *testing.T) {
+		// First try with an invalid hash info
+		t.Logf(" \t [-] Trying to follow with an invalid hash\n")
+		ctx, cancel = context.WithCancel(context.Background())
 		defer cancel()
 
-		t.Logf(" \t [-] Starting to follow chain with a valid hash. %d <= %d \n", upTo, exp)
-		t.Logf(" \t\t --> beaconID: %s ; hash-chain: %s\n", beaconID, hash)
-		progress, errCh, err := newClient.StartFollowChain(ctx, hash, addrToFollow, tls, upTo, beaconID)
-		require.NoError(t, err)
+		_, errCh, _ := newClient.StartFollowChain(ctx, "deadbeef", addrToFollow, tls, 10000, beaconID)
+		expectChanFail(t, errCh)
+	})
 
-		for goon := true; goon; {
-			select {
-			case p, ok := <-progress:
-				t.Logf(" \t\t --> Received progress: %d / %d \n", p.Current, p.Target)
-				if ok && p.Current == exp {
-					t.Logf("\t\t -->Successful beacon rcv. Round: %d.\n", exp)
-					goon = false
-				}
-			case e := <-errCh:
-				if errors.Is(e, io.EOF) { // means we've reached the end
-					t.Logf("\t\t -->Got EOF from daemon.\n")
-					goon = false
-					break
-				}
-				t.Logf("\t\t -->Unexpected error received: %v.\n", e)
-				require.NoError(t, e)
-			case <-time.After(2 * time.Second):
-				t.Fatalf("\t\t --> Timeout during test\n")
-			}
-		}
-
-		t.Logf(" \t\t --> Done, proceeding to check store now.\n")
-
-		// cancel the operation
+	t.Run("non-hex-hash", func(t *testing.T) {
+		// testing with a non hex hash
+		t.Logf(" \t [-] Trying to follow with a non-hex hash\n")
+		ctx, cancel = context.WithCancel(context.Background())
+		_, _, err = newClient.StartFollowChain(ctx, "tutu", addrToFollow, tls, 10000, beaconID)
+		require.Error(t, err)
 		cancel()
+	})
 
-		// Since the context gets canceled above, we need a fresh one.
-		// We need this context to allow us to check the store values.
-		c, cx := context.WithCancel(context.Background())
-		defer cx()
+	t.Run("invalid-beacon-id", func(t *testing.T) {
+		// testing with a invalid beaconID
+		t.Logf(" \t [-] Trying to follow with an invalid beaconID\n")
+		ctx, cancel = context.WithCancel(context.Background())
+		_, errCh, _ := newClient.StartFollowChain(ctx, hash, addrToFollow, tls, 10000, "tutu")
+		expectChanFail(t, errCh)
+		cancel()
+	})
 
-		// check if the beacon is in the database
-		store, err := newNode.drand.createBoltStore()
-		require.NoError(t, err)
-		defer store.Close(c)
+	t.Run("check-resp-round-2", func(t *testing.T) {
+		checkStore(t, newNode, newClient, beaconID, hash, addrToFollow, tls, resp.GetRound()-2, resp.GetRound()-2)
+	})
 
-		lastB, err := store.Last(c)
-		require.NoError(t, err)
-		require.Equal(t, exp, lastB.Round, "found %d vs expected %d", lastB.Round, exp)
+	t.Run("check-resp-up-to-0", func(t *testing.T) {
+		checkStore(t, newNode, newClient, beaconID, hash, addrToFollow, tls, 0, resp.GetRound())
+	})
+}
+
+func checkStore(t *testing.T, newNode *MockNode, newClient *net.ControlClient, beaconID, hash string, addrToFollow []string, tls bool, upTo, exp uint64) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	t.Logf(" \t [-] Starting to follow chain with a valid hash. %d <= %d \n", upTo, exp)
+	t.Logf(" \t\t --> beaconID: %s ; hash-chain: %s\n", beaconID, hash)
+	progress, errCh, err := newClient.StartFollowChain(ctx, hash, addrToFollow, tls, upTo, beaconID)
+	require.NoError(t, err)
+
+	for goon := true; goon; {
+		select {
+		case p, ok := <-progress:
+			t.Logf(" \t\t --> Received progress: %d / %d \n", p.Current, p.Target)
+			if ok && p.Current == exp {
+				t.Logf("\t\t -->Successful beacon rcv. Round: %d.\n", exp)
+				goon = false
+			}
+		case e := <-errCh:
+			if errors.Is(e, io.EOF) { // means we've reached the end
+				t.Logf("\t\t -->Got EOF from daemon.\n")
+				goon = false
+				break
+			}
+			t.Logf("\t\t -->Unexpected error received: %v.\n", e)
+			require.NoError(t, e)
+		case <-time.After(2 * time.Second):
+			t.Fatalf("\t\t --> Timeout during test\n")
+		}
 	}
 
-	fn(resp.GetRound()-2, resp.GetRound()-2)
-	fn(0, resp.GetRound())
+	t.Logf(" \t\t --> Done, proceeding to check store now.\n")
+
+	// cancel the operation
+	cancel()
+
+	// check if the beacon is in the database
+	store, err := newNode.drand.createBoltStore()
+	require.NoError(t, err)
+	defer store.Close(context.Background())
+
+	// Since the context gets canceled above, we need a fresh one.
+	// We need this context to allow us to check the store values.
+	lastB, err := store.Last(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, exp, lastB.Round, "found %d vs expected %d", lastB.Round, exp)
 }
 
 // This test makes sure the "StartCheckChain" grpc method works fine
