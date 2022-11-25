@@ -18,9 +18,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/urfave/cli/v2"
+	bolt "go.etcd.io/bbolt"
 
 	"github.com/drand/drand/chain/boltdb"
 	"github.com/drand/drand/common"
@@ -1043,6 +1045,9 @@ func contextToConfig(c *cli.Context) *core.Config {
 		}
 		opts = append(opts, core.WithTrustedCerts(paths...))
 	}
+
+	opts = append(opts, core.WithBoltOptions(&bolt.Options{Timeout: 2 * time.Second}))
+
 	conf := core.NewConfig(opts...)
 	return conf
 }
