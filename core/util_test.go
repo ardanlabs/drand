@@ -15,6 +15,7 @@ import (
 	"github.com/kabukky/httpscerts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	bolt "go.etcd.io/bbolt"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 
@@ -149,9 +150,14 @@ func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beacon
 			confOptions = append(confOptions, WithInsecure())
 		}
 
+		//nolint:gocritic // We want to chain appends for clarity
 		confOptions = append(confOptions,
 			WithControlPort(ports[i]),
 			WithLogLevel(test.LogLevel(t), false))
+
+		// Set the timeout here. Without it, we can create a race condition in tests.
+		confOptions = append(confOptions, WithBoltOptions(&bolt.Options{Timeout: 2 * time.Second}))
+
 		// add options in last so it overwrites the default
 		confOptions = append(confOptions, opts...)
 
@@ -248,7 +254,7 @@ func waitFor(
 	t *testing.T,
 	client *net.ControlClient,
 	beaconID string,
-	maxRetries int, // nolint
+	maxRetries int, //nolint:unparam // This is a parameter which can happen to have the same value across current usages
 	waitFor func(r *drand.StatusResponse) bool,
 ) bool {
 	retry := 0

@@ -36,6 +36,7 @@ type BeaconProcess struct {
 	store       key.Store
 	privGateway *net.PrivateGateway
 	pubGateway  *net.PublicGateway
+	storeDB     chain.Store
 
 	beacon *beacon.Handler
 
@@ -335,6 +336,8 @@ func (bp *BeaconProcess) newBeacon() (*beacon.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	bp.storeDB = store
 
 	b, err := beacon.NewHandler(bp.privGateway.ProtocolClient, store, conf, bp.log, bp.version)
 	if err != nil {

@@ -1177,6 +1177,8 @@ func (bp *BeaconProcess) StartFollowChain(req *drand.StartSyncRequest, stream dr
 		return fmt.Errorf("unable to create store: %w", err)
 	}
 
+	bp.storeDB = store
+
 	// TODO find a better place to put that
 	if err := store.Put(ctx, chain.GenesisBeacon(info)); err != nil {
 		bp.log.Errorw("", "start_follow_chain", "unable to insert genesis block", "err", err)

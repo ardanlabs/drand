@@ -849,17 +849,24 @@ func TestDrandFollowChain(t *testing.T) {
 	resp, err := client.PublicRand(ctx, rootID, new(drand.PublicRandRequest))
 	require.NoError(t, err)
 
-	t.Run("invalid-hash", func(t *testing.T) {
-		// First try with an invalid hash info
-		t.Logf(" \t [-] Trying to follow with an invalid hash\n")
-
-		// TEST setup a new node and fetch history
+	setupNode := func() (*MockNode, *net.ControlClient, []string, func()) {
 		newNode := dt.SetupNewNodes(t, 1)[0]
 		newClient, err := net.NewControlClient(newNode.drand.opts.controlPort)
 		require.NoError(t, err)
 
 		addrToFollow := []string{rootID.Address()}
 		ctx, cancel = context.WithCancel(context.Background())
+
+		return newNode, newClient, addrToFollow, func() {
+			defer cancel()
+			defer newNode.daemon.Stop(ctx)
+		}
+	}
+
+	t.Run("invalid-hash", func(t *testing.T) {
+		// First try with an invalid hash info
+		t.Logf(" \t [-] Trying to follow with an invalid hash\n")
+		_, newClient, addrToFollow, cancel := setupNode()
 		defer cancel()
 
 		_, errCh, _ := newClient.StartFollowChain(ctx, "deadbeef", addrToFollow, true, 10000, beaconID)
@@ -869,14 +876,7 @@ func TestDrandFollowChain(t *testing.T) {
 	t.Run("non-hex-hash", func(t *testing.T) {
 		// testing with a non hex hash
 		t.Logf(" \t [-] Trying to follow with a non-hex hash\n")
-
-		// TEST setup a new node and fetch history
-		newNode := dt.SetupNewNodes(t, 1)[0]
-		newClient, err := net.NewControlClient(newNode.drand.opts.controlPort)
-		require.NoError(t, err)
-
-		addrToFollow := []string{rootID.Address()}
-		ctx, cancel = context.WithCancel(context.Background())
+		_, newClient, addrToFollow, cancel := setupNode()
 		defer cancel()
 
 		_, _, err = newClient.StartFollowChain(ctx, "tutu", addrToFollow, true, 10000, beaconID)
@@ -886,17 +886,10 @@ func TestDrandFollowChain(t *testing.T) {
 	t.Run("invalid-beacon-id", func(t *testing.T) {
 		// testing with a invalid beaconID
 		t.Logf(" \t [-] Trying to follow with an invalid beaconID\n")
-
-		// TEST setup a new node and fetch history
-		newNode := dt.SetupNewNodes(t, 1)[0]
-		newClient, err := net.NewControlClient(newNode.drand.opts.controlPort)
-		require.NoError(t, err)
-
-		addrToFollow := []string{rootID.Address()}
-		hash := fmt.Sprintf("%x", chain.NewChainInfo(group).Hash())
-
-		ctx, cancel = context.WithCancel(context.Background())
+		_, newClient, addrToFollow, cancel := setupNode()
 		defer cancel()
+
+		hash := fmt.Sprintf("%x", chain.NewChainInfo(group).Hash())
 
 		_, errCh, _ := newClient.StartFollowChain(ctx, hash, addrToFollow, true, 10000, "tutu")
 		expectChanFail(t, errCh)
@@ -904,11 +897,9 @@ func TestDrandFollowChain(t *testing.T) {
 
 	t.Run("check-resp-round-2", func(t *testing.T) {
 		// TEST setup a new node and fetch history
-		newNode := dt.SetupNewNodes(t, 1)[0]
-		newClient, err := net.NewControlClient(newNode.drand.opts.controlPort)
-		require.NoError(t, err)
+		newNode, newClient, addrToFollow, cancel := setupNode()
+		defer cancel()
 
-		addrToFollow := []string{rootID.Address()}
 		hash := fmt.Sprintf("%x", chain.NewChainInfo(group).Hash())
 
 		checkStore(t, newNode, newClient, beaconID, hash, addrToFollow, true, resp.GetRound()-2, resp.GetRound()-2)
@@ -916,11 +907,9 @@ func TestDrandFollowChain(t *testing.T) {
 
 	t.Run("check-resp-up-to-0", func(t *testing.T) {
 		// TEST setup a new node and fetch history
-		newNode := dt.SetupNewNodes(t, 1)[0]
-		newClient, err := net.NewControlClient(newNode.drand.opts.controlPort)
-		require.NoError(t, err)
+		newNode, newClient, addrToFollow, cancel := setupNode()
+		defer cancel()
 
-		addrToFollow := []string{rootID.Address()}
 		hash := fmt.Sprintf("%x", chain.NewChainInfo(group).Hash())
 
 		checkStore(t, newNode, newClient, beaconID, hash, addrToFollow, true, 0, resp.GetRound())
@@ -967,18 +956,17 @@ func checkStore(t *testing.T, newNode *MockNode, newClient *net.ControlClient, b
 	// We need this context to allow us to check the store values.
 	cx := context.Background()
 
+	t.Log("attempting database interaction")
 	var store chain.Store
-	for retry := 0; retry < 10; retry++ {
-		t.Logf("attempting boltDB creation %d\n", retry)
-		store, err = newNode.drand.createBoltStore()
-		if err == nil {
-			break
-		}
-
-		time.Sleep(50 * time.Millisecond)
+	store, err = newNode.drand.createBoltStore()
+	if err != nil {
+		// If we can't create the BoltDB instance, it's most likely still in use.
+		// This happens because the sync manager still uses it but it should have been closed.
+		// So, we shortcut the process and use the beacon one.
+		store = newNode.drand.storeDB
+	} else {
+		defer store.Close(cx)
 	}
-	require.NoError(t, err)
-	defer store.Close(cx)
 
 	t.Logf("checking of beacon is in database")
 
