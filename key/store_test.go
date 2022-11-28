@@ -1,10 +1,11 @@
 package key
 
 import (
-	"github.com/drand/kyber/share/dkg"
 	"os"
 	"path"
 	"testing"
+
+	"github.com/drand/kyber/share/dkg"
 
 	"github.com/stretchr/testify/require"
 

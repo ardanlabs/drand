@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/drand/drand/crypto"
-	"github.com/drand/drand/crypto/verifier"
 	"math/rand"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/drand/drand/crypto"
+	"github.com/drand/drand/crypto/verifier"
 
 	cl "github.com/jonboulle/clockwork"
 

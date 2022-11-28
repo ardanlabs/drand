@@ -3,10 +3,11 @@ package beacon
 import (
 	"bytes"
 	"fmt"
-	"github.com/drand/drand/crypto"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/drand/drand/crypto"
 
 	clock "github.com/jonboulle/clockwork"
 

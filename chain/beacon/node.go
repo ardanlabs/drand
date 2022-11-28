@@ -5,11 +5,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	dcrypto "github.com/drand/drand/crypto/vault"
-	"github.com/drand/drand/crypto/verifier"
 	"strings"
 	"sync"
 	"time"
+
+	dcrypto "github.com/drand/drand/crypto/vault"
+	"github.com/drand/drand/crypto/verifier"
 
 	clock "github.com/jonboulle/clockwork"
 
@@ -382,7 +383,7 @@ func (h *Handler) broadcastNextPartial(current roundInfo, upon *chain.Beacon) {
 		round = current.round
 	}
 
-	msg := h.verifier.DigestMessage(1, previousSig)
+	msg := h.verifier.DigestMessage(round, previousSig)
 
 	currSig, err := h.crypto.SignPartial(msg)
 	if err != nil {

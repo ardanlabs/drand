@@ -1,8 +1,9 @@
 package core
 
 import (
-	"github.com/drand/drand/common/scheme"
 	"testing"
+
+	"github.com/drand/drand/common/scheme"
 
 	"github.com/stretchr/testify/require"
 

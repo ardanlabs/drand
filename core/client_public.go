@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+
 	"google.golang.org/grpc"
 
 	"github.com/drand/drand/chain"

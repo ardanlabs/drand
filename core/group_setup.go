@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/drand/drand/crypto"
+
 	clock "github.com/jonboulle/clockwork"
 
 	"github.com/drand/drand/chain"
@@ -314,10 +316,11 @@ type setupReceiver struct {
 	done     bool
 	version  commonutils.Version
 	beaconID string
+	scheme   crypto.Scheme
 }
 
 func newSetupReceiver(version commonutils.Version, l log.Logger, c clock.Clock,
-	client net.ProtocolClient, in *drand.SetupInfoPacket,
+	client net.ProtocolClient, in *drand.SetupInfoPacket, sch crypto.Scheme,
 ) (*setupReceiver, error) {
 	beaconID := commonutils.GetCanonicalBeaconID(in.GetMetadata().GetBeaconID())
 
@@ -330,6 +333,7 @@ func newSetupReceiver(version commonutils.Version, l log.Logger, c clock.Clock,
 		secret:   hashSecret(in.GetSecret()),
 		version:  version,
 		beaconID: beaconID,
+		scheme:   sch,
 	}
 
 	if err := setup.fetchLeaderKey(); err != nil {
@@ -346,7 +350,7 @@ func (r *setupReceiver) fetchLeaderKey() error {
 		return err
 	}
 
-	identity := &drand.Identity{Signature: protoID.Signature, Tls: protoID.Tls, Address: protoID.Address, Key: protoID.Key}
+	identity := &drand.Identity{Signature: protoID.Signature, Tls: protoID.Tls, Address: protoID.Address, Key: protoID.Key, Scheme: r.scheme.Name}
 	id, err := key.IdentityFromProto(identity)
 	if err != nil {
 		return err

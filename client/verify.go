@@ -3,9 +3,10 @@ package client
 import (
 	"context"
 	"fmt"
+	"sync"
+
 	"github.com/drand/drand/crypto"
 	"github.com/drand/drand/crypto/verifier"
-	"sync"
 
 	"github.com/drand/drand/chain"
 	"github.com/drand/drand/log"

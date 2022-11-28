@@ -5,9 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/drand/drand/crypto"
 	"math/rand"
 	"sync"
+
+	"github.com/drand/drand/crypto"
 
 	commonutils "github.com/drand/drand/common"
 	"github.com/drand/drand/key"

@@ -1,9 +1,10 @@
 package core
 
 import (
-	"github.com/drand/drand/common/scheme"
 	"testing"
 	"time"
+
+	"github.com/drand/drand/common/scheme"
 
 	clock "github.com/jonboulle/clockwork"
 

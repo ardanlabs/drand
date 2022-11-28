@@ -5,9 +5,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
+
 	"github.com/drand/drand/common/scheme"
 	"github.com/drand/drand/crypto"
-	"net"
 
 	proto "github.com/drand/drand/protobuf/drand"
 	"github.com/drand/kyber"
@@ -175,12 +176,12 @@ func (i *Identity) FromTOML(t interface{}) error {
 		return errors.New("public can't decode from non PublicTOML struct")
 	}
 	var err error
-	scheme := crypto.SchemeFromName(ptoml.SchemeName)
-	if scheme == nil {
+	sch := crypto.SchemeFromName(ptoml.SchemeName)
+	if sch == nil {
 		return fmt.Errorf("invalid Scheme name in Identity FromTOML: %s", ptoml.SchemeName)
 	}
-	i.Scheme = *scheme
-	i.Key, err = StringToPoint(scheme.KeyGroup, ptoml.Key)
+	i.Scheme = *sch
+	i.Key, err = StringToPoint(sch.KeyGroup, ptoml.Key)
 	if err != nil {
 		return fmt.Errorf("decoding public key: %w", err)
 	}
@@ -233,11 +234,11 @@ func IdentityFromProto(n *proto.Identity) (*Identity, error) {
 	if err != nil {
 		return nil, err
 	}
-	scheme := crypto.SchemeFromName(n.GetScheme())
-	if scheme == nil {
+	sch := crypto.SchemeFromName(n.GetScheme())
+	if sch == nil {
 		return nil, fmt.Errorf("invalid Scheme name in IdentityFromProto: %s", n.GetScheme())
 	}
-	public := scheme.KeyGroup.Point()
+	public := sch.KeyGroup.Point()
 	if err := public.UnmarshalBinary(n.GetKey()); err != nil {
 		return nil, err
 	}
@@ -247,7 +248,7 @@ func IdentityFromProto(n *proto.Identity) (*Identity, error) {
 		TLS:       n.Tls,
 		Key:       public,
 		Signature: n.GetSignature(),
-		Scheme:    *scheme,
+		Scheme:    *sch,
 	}
 	return id, nil
 }

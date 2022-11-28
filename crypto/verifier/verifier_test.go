@@ -1,10 +1,11 @@
 package verifier
 
 import (
+	"testing"
+
 	"github.com/drand/drand/chain"
 	"github.com/drand/drand/common/scheme"
 	"github.com/drand/kyber/util/random"
-	"testing"
 )
 
 func BenchmarkVerifyBeacon(b *testing.B) {

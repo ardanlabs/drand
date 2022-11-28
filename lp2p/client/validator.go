@@ -3,9 +3,10 @@ package client
 import (
 	"bytes"
 	"context"
+	"time"
+
 	"github.com/drand/drand/crypto"
 	"github.com/drand/drand/crypto/verifier"
-	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"

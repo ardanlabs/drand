@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/drand/drand/crypto"
-	verifier2 "github.com/drand/drand/crypto/verifier"
-	"github.com/drand/kyber/share/dkg"
 	"os"
 	"path"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/drand/drand/crypto"
+	verifier2 "github.com/drand/drand/crypto/verifier"
+	"github.com/drand/kyber/share/dkg"
 
 	clock "github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"

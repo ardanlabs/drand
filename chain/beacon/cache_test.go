@@ -1,9 +1,10 @@
 package beacon
 
 import (
+	"testing"
+
 	"github.com/drand/drand/crypto"
 	"github.com/drand/drand/crypto/verifier"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 
@@ -42,14 +43,14 @@ func TestCacheRound(t *testing.T) {
 	sch := scheme.GetSchemeFromEnv()
 	verifier := verifier.NewVerifier(sch)
 
-	msg := verifier.DigestMessage(1, prev)
+	msg := verifier.DigestMessage(round, prev)
 	partial := generatePartial(1, round, prev)
 	p2 := generatePartial(2, round, prev)
 	cache := newRoundCache(id, partial, *verifier)
 	require.True(t, cache.append(partial))
 	require.False(t, cache.append(partial))
 	require.Equal(t, 1, cache.Len())
-	require.Equal(t, msg, verifier.DigestMessage(1, cache.prev))
+	require.Equal(t, msg, verifier.DigestMessage(cache.round, cache.prev))
 
 	require.True(t, cache.append(p2))
 	require.Equal(t, 2, cache.Len())

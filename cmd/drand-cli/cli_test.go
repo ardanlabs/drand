@@ -5,8 +5,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"github.com/drand/drand/crypto"
-	"github.com/drand/kyber/share/dkg"
 	gnet "net"
 	"os"
 	"os/exec"
@@ -15,6 +13,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/drand/drand/crypto"
+	"github.com/drand/kyber/share/dkg"
 
 	"github.com/BurntSushi/toml"
 	"github.com/kabukky/httpscerts"

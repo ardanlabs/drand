@@ -8,10 +8,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/drand/drand/crypto"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/drand/drand/crypto"
 
 	clock "github.com/jonboulle/clockwork"
 
@@ -568,7 +569,7 @@ func (bp *BeaconProcess) setupAutomaticDKG(_ context.Context, in *drand.InitDKGP
 		bp.log.Infow("", "dkg_setup", "already_in_progress", "restart", "dkg")
 		bp.receiver.stop()
 	}
-	receiver, err := newSetupReceiver(bp.version, bp.log, bp.opts.clock, bp.privGateway.ProtocolClient, in.GetInfo())
+	receiver, err := newSetupReceiver(bp.version, bp.log, bp.opts.clock, bp.privGateway.ProtocolClient, in.GetInfo(), bp.priv.Scheme())
 	if err != nil {
 		bp.log.Errorw("", "setup", "fail", "err", err)
 		bp.state.Unlock()
@@ -666,7 +667,7 @@ func (bp *BeaconProcess) setupAutomaticResharing(_ context.Context, oldGroup *ke
 		bp.receiver = nil
 	}
 
-	receiver, err := newSetupReceiver(bp.version, bp.log, bp.opts.clock, bp.privGateway.ProtocolClient, in.GetInfo())
+	receiver, err := newSetupReceiver(bp.version, bp.log, bp.opts.clock, bp.privGateway.ProtocolClient, in.GetInfo(), bp.priv.Scheme())
 	if err != nil {
 		bp.log.Errorw("", "setup", "fail", "err", err)
 		bp.state.Unlock()

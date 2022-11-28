@@ -3,6 +3,7 @@ package beacon
 import (
 	"context"
 	"fmt"
+
 	"github.com/drand/drand/crypto/vault"
 	"github.com/drand/drand/crypto/verifier"
 
