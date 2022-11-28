@@ -2,6 +2,7 @@ package beacon
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"runtime"
 	"sync"
@@ -35,20 +36,20 @@ type appendStore struct {
 }
 
 func newAppendStore(s chain.Store) chain.Store {
-	last, _ := s.Last()
+	last, _ := s.Last(context.Background())
 	return &appendStore{
 		Store: s,
 		last:  last,
 	}
 }
 
-func (a *appendStore) Put(b *chain.Beacon) error {
+func (a *appendStore) Put(ctx context.Context, b *chain.Beacon) error {
 	a.Lock()
 	defer a.Unlock()
 	if b.Round != a.last.Round+1 {
 		return fmt.Errorf("invalid round inserted: last %d, new %d", a.last.Round, b.Round)
 	}
-	if err := a.Store.Put(b); err != nil {
+	if err := a.Store.Put(ctx, b); err != nil {
 		return err
 	}
 	a.last = b
@@ -64,7 +65,8 @@ type schemeStore struct {
 }
 
 func NewSchemeStore(s chain.Store, sch crypto.Scheme) chain.Store {
-	last, _ := s.Last()
+	last, _ := s.Last(context.Background())
+
 	return &schemeStore{
 		Store: s,
 		last:  last,
@@ -72,7 +74,7 @@ func NewSchemeStore(s chain.Store, sch crypto.Scheme) chain.Store {
 	}
 }
 
-func (a *schemeStore) Put(b *chain.Beacon) error {
+func (a *schemeStore) Put(ctx context.Context, b *chain.Beacon) error {
 	a.Lock()
 	defer a.Unlock()
 
@@ -82,13 +84,13 @@ func (a *schemeStore) Put(b *chain.Beacon) error {
 	if !a.sch.IsPreviousSigSignificant {
 		b.PreviousSig = nil
 	} else if !bytes.Equal(a.last.Signature, b.PreviousSig) {
-		if pb, err := a.Get(b.Round - 1); err != nil || !bytes.Equal(pb.Signature, b.PreviousSig) {
+		if pb, err := a.Get(ctx, b.Round-1); err != nil || !bytes.Equal(pb.Signature, b.PreviousSig) {
 			return fmt.Errorf("invalid previous signature for %d or "+
 				"previous beacon not found in database. Err: %w", b.Round, err)
 		}
 	}
 
-	if err := a.Store.Put(b); err != nil {
+	if err := a.Store.Put(ctx, b); err != nil {
 		return err
 	}
 
@@ -113,22 +115,32 @@ func newDiscrepancyStore(s chain.Store, l log.Logger, group *key.Group, cl clock
 	}
 }
 
-func (d *discrepancyStore) Put(b *chain.Beacon) error {
-	if err := d.Store.Put(b); err != nil {
+func (d *discrepancyStore) Put(ctx context.Context, b *chain.Beacon) error {
+	// When computing time_discrepancy, time.Now() should be obtained as close as
+	// possible to receiving the beacon, before any other storage layer interaction.
+	// When moved after store.Put(), the value will include the time it takes
+	// the storage layer to store the value, making it inaccurate.
+	actual := d.clock.Now()
+
+	if err := d.Store.Put(ctx, b); err != nil {
 		return err
 	}
 
-	beaconID := common.GetCanonicalBeaconID(d.group.ID)
+	storageTime := d.clock.Now()
 
-	actual := d.clock.Now().UnixNano()
 	expected := chain.TimeOfRound(d.group.Period, d.group.GenesisTime, b.Round) * 1e9
-	discrepancy := float64(actual-expected) / float64(time.Millisecond)
+	discrepancy := float64(actual.UnixNano()-expected) / float64(time.Millisecond)
 
-	metrics.BeaconDiscrepancyLatency.WithLabelValues(beaconID).Set(float64(actual-expected) / float64(time.Millisecond))
+	beaconID := common.GetCanonicalBeaconID(d.group.ID)
+	metrics.BeaconDiscrepancyLatency.WithLabelValues(beaconID).Set(discrepancy)
 	metrics.LastBeaconRound.WithLabelValues(beaconID).Set(float64(b.GetRound()))
 	metrics.GroupSize.WithLabelValues(beaconID).Set(float64(d.group.Len()))
 	metrics.GroupThreshold.WithLabelValues(beaconID).Set(float64(d.group.Threshold))
-	d.l.Infow("", "NEW_BEACON_STORED", b.String(), "time_discrepancy_ms", discrepancy)
+	d.l.Infow("",
+		"NEW_BEACON_STORED", b.String(),
+		"time_discrepancy_ms", discrepancy,
+		"storage_time_ms", storageTime.Sub(actual).Milliseconds(),
+	)
 	return nil
 }
 
@@ -161,8 +173,8 @@ func NewCallbackStore(s chain.Store) CallbackStore {
 }
 
 // Put stores a new beacon
-func (c *callbackStore) Put(b *chain.Beacon) error {
-	if err := c.Store.Put(b); err != nil {
+func (c *callbackStore) Put(ctx context.Context, b *chain.Beacon) error {
+	if err := c.Store.Put(ctx, b); err != nil {
 		return err
 	}
 	if b.Round != 0 {
@@ -191,9 +203,9 @@ func (c *callbackStore) RemoveCallback(id string) {
 	delete(c.callbacks, id)
 }
 
-func (c *callbackStore) Close() {
-	c.Store.Close()
-	close(c.done)
+func (c *callbackStore) Close(ctx context.Context) error {
+	defer close(c.done)
+	return c.Store.Close(ctx)
 }
 
 func (c *callbackStore) runWorkers(n int) {
