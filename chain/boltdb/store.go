@@ -23,6 +23,8 @@ type BoltStore struct {
 	db *bolt.DB
 
 	log log.Logger
+
+	requiresPrevious bool
 }
 
 var beaconBucket = []byte("beacons")
@@ -34,7 +36,7 @@ const BoltFileName = "drand.db"
 const BoltStoreOpenPerm = 0660
 
 // NewBoltStore returns a Store implementation using the boltdb storage engine.
-func NewBoltStore(l log.Logger, folder string, opts *bolt.Options) (*BoltStore, error) {
+func NewBoltStore(ctx context.Context, l log.Logger, folder string, opts *bolt.Options) (*BoltStore, error) {
 	dbPath := path.Join(folder, BoltFileName)
 	db, err := bolt.Open(dbPath, BoltStoreOpenPerm, opts)
 	if err != nil {
@@ -49,6 +51,8 @@ func NewBoltStore(l log.Logger, folder string, opts *bolt.Options) (*BoltStore, 
 	return &BoltStore{
 		log: l,
 		db:  db,
+
+		requiresPrevious: chain.PreviousRequiredFromContext(ctx),
 	}, err
 }
 
@@ -81,13 +85,9 @@ func (b *BoltStore) Put(_ context.Context, beacon *chain.Beacon) error {
 	return b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(beaconBucket)
 		key := chain.RoundToBytes(beacon.Round)
-		buff, err := beacon.Marshal()
+		err := bucket.Put(key, beacon.Signature)
 		if err != nil {
-			return err
-		}
-		err = bucket.Put(key, buff)
-		if err != nil {
-			b.log.Debugw("storing beacon", "round", beacon.Round, "err", err)
+			b.log.Errorw("storing beacon", "round", beacon.Round, "err", err)
 		}
 		return err
 	})
@@ -99,11 +99,13 @@ func (b *BoltStore) Last(context.Context) (*chain.Beacon, error) {
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(beaconBucket)
 		cursor := bucket.Cursor()
-		_, v := cursor.Last()
-		if v == nil {
-			return chainerrors.ErrNoBeaconStored
+		b, err := b.getCursorBeacon(bucket, cursor.Last)
+		if err != nil {
+			return err
 		}
-		return beacon.Unmarshal(v)
+
+		*beacon = *b
+		return nil
 	})
 	return beacon, err
 }
@@ -113,11 +115,13 @@ func (b *BoltStore) Get(_ context.Context, round uint64) (*chain.Beacon, error) 
 	beacon := &chain.Beacon{}
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(beaconBucket)
-		v := bucket.Get(chain.RoundToBytes(round))
-		if v == nil {
-			return chainerrors.ErrNoBeaconStored
+		b, err := b.getBeacon(bucket, round, true)
+		if err != nil {
+			return err
 		}
-		return beacon.Unmarshal(v)
+
+		*beacon = *b
+		return nil
 	})
 	return beacon, err
 }
@@ -133,7 +137,7 @@ func (b *BoltStore) Cursor(ctx context.Context, fn func(context.Context, chain.C
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(beaconBucket)
 		c := bucket.Cursor()
-		return fn(ctx, &boltCursor{Cursor: c})
+		return fn(ctx, &boltCursor{Cursor: c, store: b})
 	})
 	if err != nil {
 		b.log.Errorw("", "boltdb", "error getting cursor", "err", err)
@@ -151,44 +155,95 @@ func (b *BoltStore) SaveTo(_ context.Context, w io.Writer) error {
 
 type boltCursor struct {
 	*bolt.Cursor
+	store *BoltStore
 }
 
 func (c *boltCursor) First(context.Context) (*chain.Beacon, error) {
-	k, v := c.Cursor.First()
-	if k == nil {
-		return nil, chainerrors.ErrNoBeaconStored
-	}
-	b := &chain.Beacon{}
-	err := b.Unmarshal(v)
-	return b, err
+	return c.store.getCursorBeacon(c.Bucket(), c.Cursor.First)
 }
 
 func (c *boltCursor) Next(context.Context) (*chain.Beacon, error) {
-	k, v := c.Cursor.Next()
-	if k == nil {
-		return nil, chainerrors.ErrNoBeaconStored
-	}
-	b := &chain.Beacon{}
-	err := b.Unmarshal(v)
-	return b, err
+	return c.store.getCursorBeacon(c.Bucket(), c.Cursor.Next)
 }
 
 func (c *boltCursor) Seek(_ context.Context, round uint64) (*chain.Beacon, error) {
-	k, v := c.Cursor.Seek(chain.RoundToBytes(round))
-	if k == nil {
+	_, v := c.Cursor.Seek(chain.RoundToBytes(round))
+	if v == nil {
 		return nil, chainerrors.ErrNoBeaconStored
 	}
-	b := &chain.Beacon{}
-	err := b.Unmarshal(v)
-	return b, err
+
+	b := chain.Beacon{
+		Round:     round,
+		Signature: v,
+	}
+
+	if c.store.requiresPrevious &&
+		b.Round > 0 {
+		prevBeacon, err := c.store.getBeacon(c.Bucket(), b.Round-1, false)
+		if err != nil {
+			c.store.log.Errorw("missing previous beacon from database", "round", b.Round-1, "err", err)
+			return nil, chainerrors.ErrNoBeaconStored
+		}
+		b.PreviousSig = prevBeacon.Signature
+	}
+
+	return &b, nil
 }
 
 func (c *boltCursor) Last(context.Context) (*chain.Beacon, error) {
-	k, v := c.Cursor.Last()
-	if k == nil {
+	return c.store.getCursorBeacon(c.Bucket(), c.Cursor.Last)
+}
+
+type beaconCursorGetter func() (key []byte, value []byte)
+
+func (b *BoltStore) getBeacon(bucket *bolt.Bucket, round uint64, canFetchPrevious bool) (*chain.Beacon, error) {
+	sig := bucket.Get(chain.RoundToBytes(round))
+	if sig == nil {
 		return nil, chainerrors.ErrNoBeaconStored
 	}
-	b := &chain.Beacon{}
-	err := b.Unmarshal(v)
-	return b, err
+
+	beacon := chain.Beacon{
+		Round:     round,
+		Signature: sig,
+	}
+
+	if canFetchPrevious &&
+		b.requiresPrevious &&
+		beacon.Round > 0 {
+		prevSig := bucket.Get(chain.RoundToBytes(round - 1))
+		if prevSig == nil {
+			b.log.Errorw("missing previous beacon from database", "round", beacon.Round-1)
+			return nil, chainerrors.ErrNoBeaconStored
+		}
+		beacon.PreviousSig = prevSig
+	}
+
+	return &beacon, nil
+}
+
+func (b *BoltStore) getCursorBeacon(bucket *bolt.Bucket, get beaconCursorGetter) (*chain.Beacon, error) {
+	key, sig := get()
+	if sig == nil {
+		return nil, chainerrors.ErrNoBeaconStored
+	}
+
+	beacon := chain.Beacon{
+		Round:     chain.BytesToRound(key),
+		Signature: sig,
+	}
+
+	if b.requiresPrevious &&
+		beacon.Round > 0 {
+		prevBeacon, err := b.getBeacon(bucket, beacon.Round-1, false)
+		if err != nil {
+			return nil, err
+		}
+		if prevBeacon == nil {
+			b.log.Errorw("missing previous beacon from database", "round", beacon.Round-1)
+			return nil, chainerrors.ErrNoBeaconStored
+		}
+		beacon.PreviousSig = prevBeacon.Signature
+	}
+
+	return &beacon, nil
 }

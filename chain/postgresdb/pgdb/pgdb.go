@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 
@@ -15,9 +16,10 @@ import (
 
 // Store represents access to the postgres database for beacon management.
 type Store struct {
-	log      log.Logger
-	db       *sqlx.DB
-	beaconID int
+	log              log.Logger
+	db               *sqlx.DB
+	beaconID         int
+	requiresPrevious bool
 }
 
 // NewStore returns a new store that provides the CRUD based API needed for
@@ -26,6 +28,8 @@ func NewStore(ctx context.Context, l log.Logger, db *sqlx.DB, beaconName string)
 	p := Store{
 		log: l,
 		db:  db,
+
+		requiresPrevious: chain.PreviousRequiredFromContext(ctx),
 	}
 
 	id, err := p.AddBeaconID(ctx, beaconName)
@@ -123,9 +127,9 @@ func (p *Store) Len(ctx context.Context) (int, error) {
 func (p *Store) Put(ctx context.Context, b *chain.Beacon) error {
 	const query = `
 	INSERT INTO beacon_details
-		(beacon_id, round, signature, previous_sig)
+		(beacon_id, round, signature)
 	VALUES
-		(:beacon_id, :round, :signature, :previous_sig)
+		(:beacon_id, :round, :signature)
 	ON CONFLICT DO NOTHING`
 
 	data := struct {
@@ -134,9 +138,8 @@ func (p *Store) Put(ctx context.Context, b *chain.Beacon) error {
 	}{
 		BeaconID: p.beaconID,
 		dbBeacon: dbBeacon{
-			Round:       b.Round,
-			Signature:   b.Signature,
-			PreviousSig: b.PreviousSig,
+			Round:     b.Round,
+			Signature: b.Signature,
 		},
 	}
 
@@ -144,11 +147,49 @@ func (p *Store) Put(ctx context.Context, b *chain.Beacon) error {
 	return err
 }
 
+// BatchPut adds the specified beacon to the database.
+func (p *Store) BatchPut(ctx context.Context, bs []chain.Beacon) error {
+	qry := strings.Builder{}
+	qry.WriteString(`
+	INSERT INTO beacon_details
+		(beacon_id, round, signature)
+	VALUES
+`)
+
+	data := []any{p.beaconID}
+
+	j := 1
+	for i := 0; i < len(bs)-1; i++ {
+		qry.WriteString(fmt.Sprintf(" ($1, $%d, $%d),\n", j+1, j+2))
+		j += 2
+
+		data = append(data,
+			bs[i].Round,
+			bs[i].Signature,
+		)
+	}
+
+	i := len(bs) - 1
+	qry.WriteString(fmt.Sprintf(" ($1, $%d, $%d)\n", j+1, j+2))
+	data = append(data,
+		bs[i].Round,
+		bs[i].Signature,
+	)
+
+	var query = qry.String()
+	if _, err := p.db.ExecContext(ctx, query, data...); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Last returns the last beacon stored in the configured beacon table.
 func (p *Store) Last(ctx context.Context) (*chain.Beacon, error) {
 	const query = `
 	SELECT
-		round, signature, previous_sig
+		round,
+		signature
 	FROM
 		beacon_details
 	WHERE
@@ -163,14 +204,19 @@ func (p *Store) Last(ctx context.Context) (*chain.Beacon, error) {
 		ID: p.beaconID,
 	}
 
-	return p.getBeacon(ctx, query, data)
+	return p.getBeacon(ctx, true, query, data)
 }
 
 // Get returns the specified beacon from the configured beacon table.
 func (p *Store) Get(ctx context.Context, round uint64) (*chain.Beacon, error) {
+	return p.get(ctx, round, true)
+}
+
+func (p *Store) get(ctx context.Context, round uint64, canFetchPrevious bool) (*chain.Beacon, error) {
 	const query = `
 	SELECT
-		round, signature, previous_sig 
+		round,
+		signature 
 	FROM
 		beacon_details
 	WHERE
@@ -186,7 +232,7 @@ func (p *Store) Get(ctx context.Context, round uint64) (*chain.Beacon, error) {
 		Round: round,
 	}
 
-	return p.getBeacon(ctx, query, data)
+	return p.getBeacon(ctx, canFetchPrevious, query, data)
 }
 
 // Del removes the specified round from the beacon table.
@@ -225,6 +271,24 @@ func (p *Store) SaveTo(context.Context, io.Writer) error {
 	return fmt.Errorf("saveTo not implemented for Postgres Store")
 }
 
+func (p *Store) DropFK(ctx context.Context) error {
+	const query = `
+		ALTER TABLE beacon_details
+		DROP CONSTRAINT fk_beacon_id`
+
+	_, err := p.db.ExecContext(ctx, query)
+	return err
+}
+
+func (p *Store) AddFK(ctx context.Context) error {
+	const query = `
+		ALTER TABLE beacon_details
+		ADD CONSTRAINT fk_beacon_id FOREIGN KEY (beacon_id) REFERENCES beacons(id) ON DELETE CASCADE`
+
+	_, err := p.db.ExecContext(ctx, query)
+	return err
+}
+
 // =============================================================================
 
 // cursor implements support for iterating through the beacon table.
@@ -241,7 +305,8 @@ func (c *cursor) First(ctx context.Context) (*chain.Beacon, error) {
 
 	const query = `
 	SELECT
-		round, signature, previous_sig
+		round,
+		signature
 	FROM
 		beacon_details
 	WHERE
@@ -255,7 +320,7 @@ func (c *cursor) First(ctx context.Context) (*chain.Beacon, error) {
 		ID: c.store.beaconID,
 	}
 
-	return c.store.getBeacon(ctx, query, data)
+	return c.store.getBeacon(ctx, true, query, data)
 }
 
 // Next returns the next beacon from the configured beacon table.
@@ -266,7 +331,8 @@ func (c *cursor) Next(ctx context.Context) (*chain.Beacon, error) {
 
 	const query = `
 	SELECT
-		round, signature, previous_sig
+		round,
+		signature
 	FROM
 		beacon_details
 	WHERE
@@ -283,14 +349,15 @@ func (c *cursor) Next(ctx context.Context) (*chain.Beacon, error) {
 		Offset: c.pos + 1,
 	}
 
-	return c.store.getBeacon(ctx, query, data)
+	return c.store.getBeacon(ctx, true, query, data)
 }
 
 // Seek searches the beacon table for the specified round
 func (c *cursor) Seek(ctx context.Context, round uint64) (*chain.Beacon, error) {
 	const query = `
 	SELECT
-		round, signature, previous_sig
+		round,
+		signature
 	FROM
 		beacon_details
 	WHERE
@@ -306,7 +373,7 @@ func (c *cursor) Seek(ctx context.Context, round uint64) (*chain.Beacon, error) 
 		Round: round,
 	}
 
-	ret, err := c.store.getBeacon(ctx, query, data)
+	ret, err := c.store.getBeacon(ctx, true, query, data)
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +386,8 @@ func (c *cursor) Seek(ctx context.Context, round uint64) (*chain.Beacon, error) 
 func (c *cursor) Last(ctx context.Context) (*chain.Beacon, error) {
 	const query = `
 	SELECT
-		round, signature, previous_sig
+		round,
+		signature
 	FROM
 		beacon_details
 	WHERE
@@ -334,7 +402,7 @@ func (c *cursor) Last(ctx context.Context) (*chain.Beacon, error) {
 		ID: c.store.beaconID,
 	}
 
-	ret, err := c.store.getBeacon(ctx, query, data)
+	ret, err := c.store.getBeacon(ctx, true, query, data)
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +448,7 @@ func (c *cursor) seekPosition(ctx context.Context, round uint64) error {
 	return err
 }
 
-func (p *Store) getBeacon(ctx context.Context, query string, data interface{}) (*chain.Beacon, error) {
+func (p *Store) getBeacon(ctx context.Context, canFetchPrevious bool, query string, data interface{}) (*chain.Beacon, error) {
 	var ret dbBeacon
 	rows, err := p.db.NamedQueryContext(ctx, query, data)
 	if err != nil {
@@ -394,6 +462,21 @@ func (p *Store) getBeacon(ctx context.Context, query string, data interface{}) (
 
 	if err := rows.StructScan(&ret); err != nil {
 		return nil, err
+	}
+
+	p.log.Debugw("florin: p.getBeacon() -> previous ->",
+		"canFetchPrevious", canFetchPrevious,
+		"p.requiresPrevious", p.requiresPrevious,
+		"ret.Round", ret.Round,
+	)
+	if canFetchPrevious &&
+		p.requiresPrevious &&
+		ret.Round > 0 {
+		prev, err := p.get(ctx, ret.Round-1, false)
+		if err != nil {
+			return nil, err
+		}
+		ret.PreviousSig = prev.Signature
 	}
 
 	return toChainBeacon(ret), nil

@@ -14,6 +14,7 @@ import (
 	"github.com/drand/drand/chain/memdb"
 	"github.com/drand/drand/chain/postgresdb/pgdb"
 	commonutils "github.com/drand/drand/common"
+	"github.com/drand/drand/common/scheme"
 	"github.com/drand/drand/fs"
 	"github.com/drand/drand/key"
 	dlog "github.com/drand/drand/log"
@@ -322,17 +323,23 @@ func (bp *BeaconProcess) createDBStore() (chain.Store, error) {
 	var dbStore chain.Store
 	var err error
 
+	ctx := context.Background()
+	if bp.group != nil &&
+		bp.group.Scheme.ID == scheme.DefaultSchemeID {
+		ctx = chain.SetPreviousRequiredOnContext(ctx)
+	}
+
 	switch bp.opts.dbStorageEngine {
 	case chain.BoltDB:
 		dbPath := bp.opts.DBFolder(beaconName)
 		fs.CreateSecureFolder(dbPath)
-		dbStore, err = boltdb.NewBoltStore(bp.log, dbPath, bp.opts.boltOpts)
+		dbStore, err = boltdb.NewBoltStore(ctx, bp.log, dbPath, bp.opts.boltOpts)
 
 	case chain.MemDB:
 		dbStore, err = memdb.NewStore(bp.opts.memDBSize), nil
 
 	case chain.PostgreSQL:
-		dbStore, err = pgdb.NewStore(context.TODO(), bp.log, bp.opts.pgConn, beaconName)
+		dbStore, err = pgdb.NewStore(ctx, bp.log, bp.opts.pgConn, beaconName)
 
 	default:
 		bp.log.Error("unknown database storage engine type", bp.opts.dbStorageEngine)
@@ -340,7 +347,7 @@ func (bp *BeaconProcess) createDBStore() (chain.Store, error) {
 		dbPath := bp.opts.DBFolder(beaconName)
 		fs.CreateSecureFolder(dbPath)
 
-		dbStore, err = boltdb.NewBoltStore(bp.log, dbPath, bp.opts.boltOpts)
+		dbStore, err = boltdb.NewBoltStore(ctx, bp.log, dbPath, bp.opts.boltOpts)
 	}
 
 	bp.dbStore = dbStore

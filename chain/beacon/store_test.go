@@ -14,13 +14,15 @@ import (
 )
 
 func TestSchemeStore(t *testing.T) {
-	sch, _ := scheme.ReadSchemeByEnv()
-
 	dir := t.TempDir()
 	ctx := context.Background()
+	sch := scheme.GetSchemeFromEnv()
+	if sch.ID == scheme.DefaultSchemeID {
+		ctx = chain.SetPreviousRequiredOnContext(ctx)
+	}
 
 	l := test.Logger(t)
-	bstore, err := boltdb.NewBoltStore(l, dir, nil)
+	bstore, err := boltdb.NewBoltStore(ctx, l, dir, nil)
 	require.NoError(t, err)
 
 	genesisBeacon := chain.GenesisBeacon(&chain.Info{GenesisSeed: []byte("genesis_signature")})

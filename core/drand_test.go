@@ -1039,7 +1039,18 @@ func TestDrandCheckChain(t *testing.T) {
 	require.NoError(t, err)
 	consumeProgress(t, progress, errCh, upTo, true)
 	// check that progress is (0, 1)
-	consumeProgress(t, progress, errCh, 1, false)
+	incorrectBeacons := uint64(1)
+	if cfg.dbStorageEngine == chain.PostgreSQL {
+		// Until the BoltDB implementation is migrated to the round,signature format
+		// we need to have a special case for this test.
+		// The reason is that one missing beacon from the database will affect the next
+		// beacon too, as it cannot compose the chain correctly and a database heal is
+		// now required.
+		//
+		// TODO: Migrate this always read as 2 when the BoltDB format migration is done
+		incorrectBeacons = 2
+	}
+	consumeProgress(t, progress, errCh, incorrectBeacons, false)
 
 	// we wait to make sure everything is done on the sync manager side before testing.
 	time.Sleep(time.Second)
@@ -1053,9 +1064,9 @@ func TestDrandCheckChain(t *testing.T) {
 	require.NoError(t, err)
 	consumeProgress(t, progress, errCh, upTo, true)
 	// check that progress is (0, 1)
-	consumeProgress(t, progress, errCh, 1, false)
+	consumeProgress(t, progress, errCh, incorrectBeacons, false)
 	// goes on with correcting the chain
-	consumeProgress(t, progress, errCh, 1, true)
+	consumeProgress(t, progress, errCh, incorrectBeacons, true)
 	// now the progress chan should be closed
 	_, ok := <-progress
 	require.False(t, ok)
