@@ -11,10 +11,12 @@ import (
 	"github.com/drand/drand/common/scheme"
 	"github.com/drand/drand/log"
 	"github.com/drand/drand/test"
+	"github.com/drand/drand/test/testlogger"
 )
 
 func TestBeaconProcess_Stop(t *testing.T) {
 	sch := scheme.GetSchemeFromEnv()
+	l := testlogger.New(t)
 	privs, _ := test.BatchIdentities(1, sch, t.Name())
 
 	port := test.FreePort()
@@ -27,7 +29,7 @@ func TestBeaconProcess_Stop(t *testing.T) {
 		WithLogLevel(log.LogDebug, false),
 	}
 
-	dd, err := NewDrandDaemon(NewConfig(confOptions...))
+	dd, err := NewDrandDaemon(NewConfig(l, confOptions...))
 	require.NoError(t, err)
 
 	store := test.NewKeyStore()

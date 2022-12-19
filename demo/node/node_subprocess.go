@@ -1,11 +1,9 @@
 package node
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -22,6 +20,7 @@ import (
 	"github.com/drand/drand/core"
 	"github.com/drand/drand/demo/cfg"
 	"github.com/drand/drand/key"
+	"github.com/drand/drand/log"
 	"github.com/drand/drand/protobuf/drand"
 	"github.com/drand/drand/test"
 )
@@ -80,7 +79,9 @@ func NewNode(i int, cfg cfg.Config) *NodeProc {
 		dbEngineType: cfg.DBEngineType,
 		pgDSN:        cfg.PgDSN(),
 	}
-	n.setup()
+	lg := log.NewLogger(nil, log.DefaultLevel).
+		Named(fmt.Sprintf("sub-proc-node-%d", i))
+	n.setup(lg)
 	return n
 }
 
@@ -90,7 +91,7 @@ func (n *NodeProc) UpdateBinary(binary string, isCandidate bool) {
 	n.isCandidate = isCandidate
 }
 
-func (n *NodeProc) setup() {
+func (n *NodeProc) setup(lg log.Logger) {
 	var err error
 	// find a free port
 	freePort := test.FreePort()
@@ -105,7 +106,6 @@ func (n *NodeProc) setup() {
 		n.certPath = path.Join(n.base, fmt.Sprintf("server-%d.crt", n.i))
 		n.keyPath = path.Join(n.base, fmt.Sprintf("server-%d.key", n.i))
 		func() {
-			log.SetOutput(new(bytes.Buffer))
 			// XXX how to get rid of that annoying creating cert..
 			err = httpscerts.Generate(n.certPath, n.keyPath, host)
 			if err != nil {
@@ -127,7 +127,7 @@ func (n *NodeProc) setup() {
 	newKey := exec.Command(n.binary, args...)
 	runCommand(newKey)
 
-	config := core.NewConfig(core.WithConfigFolder(n.base))
+	config := core.NewConfig(lg, core.WithConfigFolder(n.base))
 	n.store = key.NewFileStore(config.ConfigFolderMB(), n.beaconID)
 
 	// verify it's done

@@ -28,6 +28,7 @@ import (
 	"github.com/drand/drand/fs"
 	"github.com/drand/drand/key"
 	"github.com/drand/drand/test"
+	"github.com/drand/drand/test/testlogger"
 	"github.com/drand/kyber"
 	"github.com/drand/kyber/share"
 	"github.com/drand/kyber/util/random"
@@ -42,7 +43,8 @@ func TestMigrate(t *testing.T) {
 	app := CLI()
 	require.NoError(t, app.Run(args))
 
-	config := core.NewConfig(core.WithConfigFolder(tmp))
+	l := testlogger.New(t)
+	config := core.NewConfig(l, core.WithConfigFolder(tmp))
 	defaultBeaconPath := path.Join(config.ConfigFolderMB(), common.DefaultBeaconID)
 
 	newGroupFilePath := path.Join(defaultBeaconPath, key.GroupFolderName)
@@ -83,12 +85,12 @@ func TestDeleteBeaconError(t *testing.T) {
 
 func TestDeleteBeacon(t *testing.T) {
 	beaconID := test.GetBeaconIDFromEnv()
-	l := test.Logger(t)
+	l := testlogger.New(t)
 	ctx := context.Background()
 	tmp := path.Join(t.TempDir(), "drand")
 
 	opt := core.WithConfigFolder(tmp)
-	conf := core.NewConfig(opt)
+	conf := core.NewConfig(l, opt)
 	fs.CreateSecureFolder(conf.DBFolder(beaconID))
 	store, err := boltdb.NewBoltStore(l, conf.DBFolder(beaconID), conf.BoltOptions())
 	require.NoError(t, err)
@@ -150,6 +152,7 @@ func TestKeySelfSignError(t *testing.T) {
 
 func TestKeySelfSign(t *testing.T) {
 	beaconID := test.GetBeaconIDFromEnv()
+	l := testlogger.New(t)
 
 	tmp := path.Join(t.TempDir(), "drand")
 
@@ -162,7 +165,7 @@ func TestKeySelfSign(t *testing.T) {
 	testCommand(t, selfSign, expectedOutput)
 
 	// load, remove signature and save
-	config := core.NewConfig(core.WithConfigFolder(tmp))
+	config := core.NewConfig(l, core.WithConfigFolder(tmp))
 	fileStore := key.NewFileStore(config.ConfigFolderMB(), beaconID)
 
 	pair, err := fileStore.LoadKeyPair()
@@ -186,13 +189,14 @@ func TestKeyGenError(t *testing.T) {
 
 func TestKeyGen(t *testing.T) {
 	beaconID := test.GetBeaconIDFromEnv()
+	l := testlogger.New(t)
 
 	tmp := path.Join(t.TempDir(), "drand")
 
 	args := []string{"drand", "generate-keypair", "--folder", tmp, "--id", beaconID, "127.0.0.1:8081"}
 	require.NoError(t, CLI().Run(args))
 
-	config := core.NewConfig(core.WithConfigFolder(tmp))
+	config := core.NewConfig(l, core.WithConfigFolder(tmp))
 	fileStore := key.NewFileStore(config.ConfigFolderMB(), beaconID)
 	priv, err := fileStore.LoadKeyPair()
 	require.NoError(t, err)
@@ -203,7 +207,7 @@ func TestKeyGen(t *testing.T) {
 	args = []string{"drand", "generate-keypair", "--folder", tmp2, "--id", beaconID}
 	require.Error(t, CLI().Run(args))
 
-	config = core.NewConfig(core.WithConfigFolder(tmp2))
+	config = core.NewConfig(l, core.WithConfigFolder(tmp2))
 	fileStore = key.NewFileStore(config.ConfigFolderMB(), beaconID)
 	priv, err = fileStore.LoadKeyPair()
 	require.Error(t, err)
@@ -319,6 +323,7 @@ func TestUtilCheck(t *testing.T) {
 //nolint:funlen
 func TestStartWithoutGroup(t *testing.T) {
 	t.Skipf("Test fails when error checking commands")
+	l := testlogger.New(t)
 	sch := scheme.GetSchemeFromEnv()
 	beaconID := test.GetBeaconIDFromEnv()
 
@@ -334,7 +339,7 @@ func TestStartWithoutGroup(t *testing.T) {
 	priv := key.NewKeyPair(addr)
 	require.NoError(t, key.Save(pubPath, priv.Public, false))
 
-	config := core.NewConfig(core.WithConfigFolder(tmpPath))
+	config := core.NewConfig(l, core.WithConfigFolder(tmpPath))
 	fileStore := key.NewFileStore(config.ConfigFolderMB(), beaconID)
 	require.NoError(t, fileStore.SaveKeyPair(priv))
 
@@ -437,6 +442,7 @@ func TestStartWithoutGroup(t *testing.T) {
 //nolint:unused // This is literally used one line above
 func testStartedDrandFunctional(t *testing.T, ctrlPort, rootPath, address string, group *key.Group, fileStore key.Store, beaconID string) {
 	t.Helper()
+	lg := testlogger.New(t)
 
 	testPing(t, ctrlPort)
 	testStatus(t, ctrlPort, beaconID)
@@ -445,7 +451,7 @@ func testStartedDrandFunctional(t *testing.T, ctrlPort, rootPath, address string
 	require.NoError(t, toml.NewEncoder(os.Stdout).Encode(group))
 
 	t.Log("Running CHAIN-INFO command")
-	chainInfo, err := json.MarshalIndent(chain.NewChainInfo(group).ToProto(nil), "", "    ")
+	chainInfo, err := json.MarshalIndent(chain.NewChainInfo(lg, group).ToProto(nil), "", "    ")
 	require.NoError(t, err)
 	expectedOutput := string(chainInfo)
 	chainInfoCmd := []string{"drand", "get", "chain-info", "--tls-disable", address}
@@ -453,7 +459,7 @@ func testStartedDrandFunctional(t *testing.T, ctrlPort, rootPath, address string
 
 	t.Log("Running CHAIN-INFO --HASH command")
 	chainInfoCmdHash := []string{"drand", "get", "chain-info", "--hash", "--tls-disable", address}
-	expectedOutput = fmt.Sprintf("%x", chain.NewChainInfo(group).Hash())
+	expectedOutput = fmt.Sprintf("%x", chain.NewChainInfo(lg, group).Hash())
 	testCommand(t, chainInfoCmdHash, expectedOutput)
 
 	t.Log("Running SHOW SHARE command")
@@ -461,12 +467,12 @@ func testStartedDrandFunctional(t *testing.T, ctrlPort, rootPath, address string
 	testCommand(t, shareCmd, expectedShareOutput)
 
 	showChainInfo := []string{"drand", "show", "chain-info", "--control", ctrlPort}
-	buffCi, err := json.MarshalIndent(chain.NewChainInfo(group).ToProto(nil), "", "    ")
+	buffCi, err := json.MarshalIndent(chain.NewChainInfo(lg, group).ToProto(nil), "", "    ")
 	require.NoError(t, err)
 	testCommand(t, showChainInfo, string(buffCi))
 
 	showChainInfo = []string{"drand", "show", "chain-info", "--hash", "--control", ctrlPort}
-	expectedOutput = fmt.Sprintf("%x", chain.NewChainInfo(group).Hash())
+	expectedOutput = fmt.Sprintf("%x", chain.NewChainInfo(lg, group).Hash())
 	testCommand(t, showChainInfo, expectedOutput)
 
 	// reset state
@@ -552,6 +558,7 @@ func testListSchemes(t *testing.T, ctrlPort string) {
 //nolint:funlen //This is a test
 func TestClientTLS(t *testing.T) {
 	t.Skipf("test fails when error checking commands")
+	l := testlogger.New(t)
 	sch := scheme.GetSchemeFromEnv()
 	beaconID := test.GetBeaconIDFromEnv()
 
@@ -571,7 +578,7 @@ func TestClientTLS(t *testing.T) {
 	priv := key.NewTLSKeyPair(addr)
 	require.NoError(t, key.Save(pubPath, priv.Public, false))
 
-	config := core.NewConfig(core.WithConfigFolder(tmpPath))
+	config := core.NewConfig(l, core.WithConfigFolder(tmpPath))
 	fileStore := key.NewFileStore(config.ConfigFolderMB(), beaconID)
 	err := fileStore.SaveKeyPair(priv)
 	require.NoError(t, err)
@@ -643,11 +650,12 @@ func TestClientTLS(t *testing.T) {
 //nolint:unused // We want to provide convenience functions
 func testStartedTLSDrandFunctional(t *testing.T, ctrlPort, certPath string, group *key.Group, priv *key.Pair) {
 	t.Helper()
+	lg := testlogger.New(t)
 
 	var err error
 
 	chainInfoCmd := []string{"drand", "get", "chain-info", "--tls-cert", certPath, priv.Public.Address()}
-	chainInfoBuff, err := json.MarshalIndent(chain.NewChainInfo(group).ToProto(nil), "", "    ")
+	chainInfoBuff, err := json.MarshalIndent(chain.NewChainInfo(lg, group).ToProto(nil), "", "    ")
 	require.NoError(t, err)
 	expectedOutput := string(chainInfoBuff)
 	testCommand(t, chainInfoCmd, expectedOutput)
@@ -1004,6 +1012,7 @@ func launchDrandInstances(t *testing.T, n int) []*drandInstance {
 
 	certsDir := path.Join(tmpPath, "certs")
 	require.NoError(t, os.Mkdir(certsDir, 0o740))
+	l := testlogger.New(t)
 
 	ins := make([]*drandInstance, 0, n)
 	for i := 1; i <= n; i++ {
@@ -1023,7 +1032,7 @@ func launchDrandInstances(t *testing.T, n int) []*drandInstance {
 		// XXX let's remove this requirement - no need for longterm keys
 		priv := key.NewTLSKeyPair(addr)
 		require.NoError(t, key.Save(pubPath, priv.Public, false))
-		config := core.NewConfig(core.WithConfigFolder(nodePath))
+		config := core.NewConfig(l, core.WithConfigFolder(nodePath))
 		fileStore := key.NewFileStore(config.ConfigFolderMB(), beaconID)
 		err = fileStore.SaveKeyPair(priv)
 		require.NoError(t, err)

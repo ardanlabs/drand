@@ -15,18 +15,20 @@ import (
 	"github.com/drand/drand/client/test/result/mock"
 	"github.com/drand/drand/common/scheme"
 	"github.com/drand/drand/test"
+	"github.com/drand/drand/test/testlogger"
 )
 
 func TestClientConstraints(t *testing.T) {
-	if _, e := client.New(); e == nil {
+	lg := testlogger.New(t)
+	if _, e := client.New(lg); e == nil {
 		t.Fatal("client can't be created without root of trust")
 	}
 
-	if _, e := client.New(client.WithChainHash([]byte{0})); e == nil {
+	if _, e := client.New(lg, client.WithChainHash([]byte{0})); e == nil {
 		t.Fatal("Client needs URLs if only a chain hash is specified")
 	}
 
-	if _, e := client.New(client.From(client.MockClientWithResults(0, 5))); e == nil {
+	if _, e := client.New(lg, client.From(client.MockClientWithResults(0, 5))); e == nil {
 		t.Fatal("Client needs root of trust unless insecure specified explicitly")
 	}
 
@@ -34,13 +36,14 @@ func TestClientConstraints(t *testing.T) {
 	// As we will run is insecurely, we will set chain info so client can fetch it
 	c.OptionalInfo = fakeChainInfo()
 
-	if _, e := client.New(client.From(c), client.Insecurely()); e != nil {
+	if _, e := client.New(lg, client.From(c), client.Insecurely()); e != nil {
 		t.Fatal(e)
 	}
 }
 
 func TestClientMultiple(t *testing.T) {
 	sch := scheme.GetSchemeFromEnv()
+	lg := testlogger.New(t)
 
 	addr1, chainInfo, cancel, _ := httpmock.NewMockHTTPPublicServer(t, false, sch)
 	defer cancel()
@@ -48,7 +51,7 @@ func TestClientMultiple(t *testing.T) {
 	addr2, _, cancel2, _ := httpmock.NewMockHTTPPublicServer(t, false, sch)
 	defer cancel2()
 
-	httpClients := http.ForURLs([]string{"http://" + addr1, "http://" + addr2}, chainInfo.Hash())
+	httpClients := http.ForURLs(lg, []string{"http://" + addr1, "http://" + addr2}, chainInfo.Hash())
 	if len(httpClients) == 0 {
 		t.Error("http clients is empty")
 		return
@@ -57,6 +60,7 @@ func TestClientMultiple(t *testing.T) {
 	var c client.Client
 	var e error
 	c, e = client.New(
+		lg,
 		client.From(httpClients...),
 		client.WithChainHash(chainInfo.Hash()))
 
@@ -80,8 +84,10 @@ func TestClientWithChainInfo(t *testing.T) {
 		GenesisTime: 100,
 		Period:      time.Second,
 	}
-	hc, _ := http.NewWithInfo("http://nxdomain.local/", chainInfo, nil)
-	c, err := client.New(client.WithChainInfo(chainInfo),
+	lg := testlogger.New(t)
+	hc, err := http.NewWithInfo(lg, "http://nxdomain.local/", chainInfo, nil)
+	require.NoError(t, err)
+	c, err := client.New(lg, client.WithChainInfo(chainInfo),
 		client.From(hc))
 	if err != nil {
 		t.Fatal("existing group creation shouldn't do additional validaiton.")
@@ -99,7 +105,8 @@ func TestClientCache(t *testing.T) {
 	addr1, chainInfo, cancel, _ := httpmock.NewMockHTTPPublicServer(t, false, sch)
 	defer cancel()
 
-	httpClients := http.ForURLs([]string{"http://" + addr1}, chainInfo.Hash())
+	lg := testlogger.New(t)
+	httpClients := http.ForURLs(lg, []string{"http://" + addr1}, chainInfo.Hash())
 	if len(httpClients) == 0 {
 		t.Error("http clients is empty")
 		return
@@ -107,7 +114,7 @@ func TestClientCache(t *testing.T) {
 
 	var c client.Client
 	var e error
-	c, e = client.New(client.From(httpClients...),
+	c, e = client.New(lg, client.From(httpClients...),
 		client.WithChainHash(chainInfo.Hash()), client.WithCacheSize(1))
 
 	if e != nil {
@@ -135,7 +142,8 @@ func TestClientWithoutCache(t *testing.T) {
 	addr1, chainInfo, cancel, _ := httpmock.NewMockHTTPPublicServer(t, false, sch)
 	defer cancel()
 
-	httpClients := http.ForURLs([]string{"http://" + addr1}, chainInfo.Hash())
+	lg := testlogger.New(t)
+	httpClients := http.ForURLs(lg, []string{"http://" + addr1}, chainInfo.Hash())
 	if len(httpClients) == 0 {
 		t.Error("http clients is empty")
 		return
@@ -144,6 +152,7 @@ func TestClientWithoutCache(t *testing.T) {
 	var c client.Client
 	var e error
 	c, e = client.New(
+		lg,
 		client.From(httpClients...),
 		client.WithChainHash(chainInfo.Hash()),
 		client.WithCacheSize(0))
@@ -165,6 +174,7 @@ func TestClientWithoutCache(t *testing.T) {
 
 func TestClientWithWatcher(t *testing.T) {
 	t.Skipf("Skip flaky test")
+	lg := testlogger.New(t)
 	sch := scheme.GetSchemeFromEnv()
 	info, results := mock.VerifiableResults(2, sch)
 
@@ -181,6 +191,7 @@ func TestClientWithWatcher(t *testing.T) {
 	var c client.Client
 	var err error
 	c, err = client.New(
+		lg,
 		client.WithChainInfo(info),
 		client.WithWatcher(watcherCtor),
 	)
@@ -199,6 +210,7 @@ func TestClientWithWatcher(t *testing.T) {
 }
 
 func TestClientWithWatcherCtorError(t *testing.T) {
+	lg := testlogger.New(t)
 	watcherErr := errors.New("boom")
 	watcherCtor := func(chainInfo *chain.Info, _ client.Cache) (client.Watcher, error) {
 		return nil, watcherErr
@@ -206,6 +218,7 @@ func TestClientWithWatcherCtorError(t *testing.T) {
 
 	// constructor should return error returned by watcherCtor
 	_, err := client.New(
+		lg,
 		client.WithChainInfo(fakeChainInfo()),
 		client.WithWatcher(watcherCtor),
 	)
@@ -215,8 +228,10 @@ func TestClientWithWatcherCtorError(t *testing.T) {
 }
 
 func TestClientChainHashOverrideError(t *testing.T) {
+	lg := testlogger.New(t)
 	chainInfo := fakeChainInfo()
 	_, err := client.Wrap(
+		lg,
 		[]client.Client{client.EmptyClientWithInfo(chainInfo)},
 		client.WithChainInfo(chainInfo),
 		client.WithChainHash(fakeChainInfo().Hash()),
@@ -230,8 +245,10 @@ func TestClientChainHashOverrideError(t *testing.T) {
 }
 
 func TestClientChainInfoOverrideError(t *testing.T) {
+	lg := testlogger.New(t)
 	chainInfo := fakeChainInfo()
 	_, err := client.Wrap(
+		lg,
 		[]client.Client{client.EmptyClientWithInfo(chainInfo)},
 		client.WithChainHash(chainInfo.Hash()),
 		client.WithChainInfo(fakeChainInfo()),
@@ -246,11 +263,12 @@ func TestClientChainInfoOverrideError(t *testing.T) {
 
 func TestClientAutoWatch(t *testing.T) {
 	sch := scheme.GetSchemeFromEnv()
+	lg := testlogger.New(t)
 
 	addr1, chainInfo, cancel, _ := httpmock.NewMockHTTPPublicServer(t, false, sch)
 	defer cancel()
 
-	httpClient := http.ForURLs([]string{"http://" + addr1}, chainInfo.Hash())
+	httpClient := http.ForURLs(lg, []string{"http://" + addr1}, chainInfo.Hash())
 	if len(httpClient) == 0 {
 		t.Error("http clients is empty")
 		return
@@ -273,6 +291,7 @@ func TestClientAutoWatch(t *testing.T) {
 	var c client.Client
 	var err error
 	c, err = client.New(
+		lg,
 		client.From(client.MockClientWithInfo(chainInfo)),
 		client.WithChainHash(chainInfo.Hash()),
 		client.WithWatcher(watcherCtor),
@@ -295,6 +314,7 @@ func TestClientAutoWatch(t *testing.T) {
 
 func TestClientAutoWatchRetry(t *testing.T) {
 	sch := scheme.GetSchemeFromEnv()
+	lg := testlogger.New(t)
 
 	info, results := mock.VerifiableResults(5, sch)
 	resC := make(chan client.Result)
@@ -334,6 +354,7 @@ func TestClientAutoWatchRetry(t *testing.T) {
 	var c client.Client
 	var err error
 	c, err = client.New(
+		lg,
 		client.From(&failer, client.MockClientWithInfo(info)),
 		client.WithChainInfo(info),
 		client.WithAutoWatch(),

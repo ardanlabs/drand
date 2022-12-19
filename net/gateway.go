@@ -7,6 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/drand/drand/log"
 	"github.com/drand/drand/protobuf/drand"
 )
 
@@ -52,19 +53,20 @@ type Service interface {
 // public methods, listening on "port" for the control methods, using the given
 // Service s with the given options.
 func NewGRPCPrivateGateway(ctx context.Context,
+	lg log.Logger,
 	listen, certPath, keyPath string,
 	certs *CertManager,
 	s Service,
 	insecure bool, opts ...grpc.DialOption) (*PrivateGateway, error) {
-	l, err := NewGRPCListenerForPrivate(ctx, listen, certPath, keyPath, s, insecure, grpc.ConnectionTimeout(time.Second))
+	l, err := NewGRPCListenerForPrivate(ctx, lg, listen, certPath, keyPath, s, insecure, grpc.ConnectionTimeout(time.Second))
 	if err != nil {
 		return nil, err
 	}
 	pg := &PrivateGateway{Listener: l}
 	if !insecure {
-		pg.ProtocolClient = NewGrpcClientFromCertManager(certs, opts...)
+		pg.ProtocolClient = NewGrpcClientFromCertManager(lg, certs, opts...)
 	} else {
-		pg.ProtocolClient = NewGrpcClient(opts...)
+		pg.ProtocolClient = NewGrpcClient(lg, opts...)
 	}
 	// duplication since client implements both...
 	// XXX Find a better fix
@@ -93,11 +95,12 @@ func (g *PublicGateway) StopAll(ctx context.Context) {
 // Service s with the given options.
 func NewRESTPublicGateway(
 	ctx context.Context,
+	lg log.Logger,
 	listen, certPath, keyPath string,
 	certs *CertManager,
 	handler http.Handler,
 	insecure bool) (*PublicGateway, error) {
-	l, err := NewRESTListenerForPublic(ctx, listen, certPath, keyPath, handler, insecure)
+	l, err := NewRESTListenerForPublic(ctx, lg, listen, certPath, keyPath, handler, insecure)
 	if err != nil {
 		return nil, err
 	}

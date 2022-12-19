@@ -17,9 +17,9 @@ import (
 	"github.com/drand/drand/chain"
 	"github.com/drand/drand/client"
 	"github.com/drand/drand/client/test/cache"
-	"github.com/drand/drand/log"
 	"github.com/drand/drand/protobuf/drand"
 	"github.com/drand/drand/test"
+	"github.com/drand/drand/test/testlogger"
 )
 
 type randomDataWrapper struct {
@@ -75,7 +75,7 @@ func fakeChainInfo() *chain.Info {
 }
 
 func TestRejectsUnmarshalBeaconFailure(t *testing.T) {
-	c := Client{log: log.DefaultLogger()}
+	c := Client{log: testlogger.New(t)}
 	validate := randomnessValidator(fakeChainInfo(), nil, &c)
 
 	msg := pubsub.Message{Message: &pb.Message{}}
@@ -87,7 +87,7 @@ func TestRejectsUnmarshalBeaconFailure(t *testing.T) {
 }
 
 func TestAcceptsWithoutTrustRoot(t *testing.T) {
-	c := Client{log: log.DefaultLogger()}
+	c := Client{log: testlogger.New(t)}
 	validate := randomnessValidator(nil, nil, &c)
 
 	resp := drand.PublicRandResponse{}
@@ -105,7 +105,7 @@ func TestAcceptsWithoutTrustRoot(t *testing.T) {
 
 func TestRejectsFutureBeacons(t *testing.T) {
 	info := fakeChainInfo()
-	c := Client{log: log.DefaultLogger()}
+	c := Client{log: testlogger.New(t)}
 	validate := randomnessValidator(info, nil, &c)
 
 	resp := drand.PublicRandResponse{
@@ -125,7 +125,7 @@ func TestRejectsFutureBeacons(t *testing.T) {
 
 func TestRejectsVerifyBeaconFailure(t *testing.T) {
 	info := fakeChainInfo()
-	c := Client{log: log.DefaultLogger()}
+	c := Client{log: testlogger.New(t)}
 	validate := randomnessValidator(info, nil, &c)
 
 	resp := drand.PublicRandResponse{
@@ -147,7 +147,7 @@ func TestRejectsVerifyBeaconFailure(t *testing.T) {
 func TestIgnoresCachedEqualBeacon(t *testing.T) {
 	info := fakeChainInfo()
 	ca := cache.NewMapCache()
-	c := Client{log: log.DefaultLogger()}
+	c := Client{log: testlogger.New(t)}
 	validate := randomnessValidator(info, ca, &c)
 	rdata := fakeRandomData(info)
 
@@ -174,7 +174,7 @@ func TestIgnoresCachedEqualBeacon(t *testing.T) {
 func TestRejectsCachedUnequalBeacon(t *testing.T) {
 	info := fakeChainInfo()
 	ca := cache.NewMapCache()
-	c := Client{log: log.DefaultLogger()}
+	c := Client{log: testlogger.New(t)}
 	validate := randomnessValidator(info, ca, &c)
 	rdata := fakeRandomData(info)
 
@@ -204,7 +204,7 @@ func TestRejectsCachedUnequalBeacon(t *testing.T) {
 func TestIgnoresCachedEqualNonRandomDataBeacon(t *testing.T) {
 	info := fakeChainInfo()
 	ca := cache.NewMapCache()
-	c := Client{log: log.DefaultLogger()}
+	c := Client{log: testlogger.New(t)}
 	validate := randomnessValidator(info, ca, &c)
 	rdata := randomDataWrapper{fakeRandomData(info)}
 
@@ -231,7 +231,7 @@ func TestIgnoresCachedEqualNonRandomDataBeacon(t *testing.T) {
 func TestRejectsCachedEqualNonRandomDataBeacon(t *testing.T) {
 	info := fakeChainInfo()
 	ca := cache.NewMapCache()
-	c := Client{log: log.DefaultLogger()}
+	c := Client{log: testlogger.New(t)}
 	validate := randomnessValidator(info, ca, &c)
 	rdata := randomDataWrapper{fakeRandomData(info)}
 

@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/drand/drand/chain"
+	"github.com/drand/drand/log"
 	"github.com/drand/drand/net"
 	"github.com/drand/drand/protobuf/common"
 	"github.com/drand/drand/protobuf/drand"
@@ -20,17 +21,17 @@ type Client struct {
 
 // NewGrpcClient returns a Client able to talk to drand instances using gRPC
 // communication method
-func NewGrpcClient(chainHash []byte, opts ...grpc.DialOption) *Client {
+func NewGrpcClient(lg log.Logger, chainHash []byte, opts ...grpc.DialOption) *Client {
 	return &Client{
-		client:    net.NewGrpcClient(opts...),
+		client:    net.NewGrpcClient(lg, opts...),
 		chainHash: chainHash,
 	}
 }
 
 // NewGrpcClientFromCert returns a client that contact its peer over TLS
-func NewGrpcClientFromCert(chainHash []byte, c *net.CertManager, opts ...grpc.DialOption) *Client {
+func NewGrpcClientFromCert(lg log.Logger, chainHash []byte, c *net.CertManager, opts ...grpc.DialOption) *Client {
 	return &Client{
-		client:    net.NewGrpcClientFromCertManager(c, opts...),
+		client:    net.NewGrpcClientFromCertManager(lg, c, opts...),
 		chainHash: chainHash,
 	}
 }

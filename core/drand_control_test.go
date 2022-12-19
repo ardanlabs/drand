@@ -7,13 +7,13 @@ import (
 	clock "github.com/jonboulle/clockwork"
 
 	"github.com/drand/drand/key"
-	"github.com/drand/drand/log"
+	"github.com/drand/drand/test/testlogger"
 	"github.com/drand/kyber"
 	"github.com/drand/kyber/util/random"
 )
 
 func TestValidateGroupTransitionGenesisTime(t *testing.T) {
-	d := BeaconProcess{log: log.DefaultLogger()}
+	d := BeaconProcess{log: testlogger.New(t)}
 	var oldgrp, newgrp key.Group
 
 	oldgrp = key.Group{GenesisTime: 0}
@@ -29,7 +29,7 @@ func TestValidateGroupTransitionGenesisTime(t *testing.T) {
 }
 
 func TestValidateGroupTransitionPeriod(t *testing.T) {
-	d := BeaconProcess{log: log.DefaultLogger()}
+	d := BeaconProcess{log: testlogger.New(t)}
 	var oldgrp, newgrp key.Group
 
 	oldgrp = key.Group{Period: 10}
@@ -45,7 +45,7 @@ func TestValidateGroupTransitionPeriod(t *testing.T) {
 }
 
 func TestValidateGroupTransitionBeaconID(t *testing.T) {
-	d := BeaconProcess{log: log.DefaultLogger()}
+	d := BeaconProcess{log: testlogger.New(t)}
 	var oldgrp, newgrp key.Group
 
 	oldgrp = key.Group{ID: "beacon_test_1"}
@@ -61,7 +61,7 @@ func TestValidateGroupTransitionBeaconID(t *testing.T) {
 }
 
 func TestValidateGroupTransitionGenesisSeed(t *testing.T) {
-	d := BeaconProcess{log: log.DefaultLogger()}
+	d := BeaconProcess{log: testlogger.New(t)}
 	var oldgrp, newgrp key.Group
 
 	randomDistPublic := func(n int) *key.DistPublic {
@@ -87,7 +87,7 @@ func TestValidateGroupTransitionGenesisSeed(t *testing.T) {
 
 func TestValidateGroupTransitionTime(t *testing.T) {
 	d := BeaconProcess{
-		log:  log.DefaultLogger(),
+		log:  testlogger.New(t),
 		opts: &Config{clock: clock.NewRealClock()},
 	}
 	var oldgrp, newgrp key.Group

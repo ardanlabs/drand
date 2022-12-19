@@ -9,13 +9,13 @@ import (
 
 	"github.com/drand/drand/chain"
 	chainerrors "github.com/drand/drand/chain/errors"
-	"github.com/drand/drand/test"
+	"github.com/drand/drand/test/testlogger"
 )
 
 func TestStoreBoltOrder(t *testing.T) {
 	tmp := t.TempDir()
 	ctx := context.Background()
-	l := test.Logger(t)
+	l := testlogger.New(t)
 	store, err := NewBoltStore(l, tmp, nil)
 	require.NoError(t, err)
 	defer func() {
@@ -55,7 +55,7 @@ func TestStoreBoltOrder(t *testing.T) {
 func TestStoreBolt(t *testing.T) {
 	tmp := t.TempDir()
 	ctx := context.Background()
-	l := test.Logger(t)
+	l := testlogger.New(t)
 
 	var sig1 = []byte{0x01, 0x02, 0x03}
 	var sig2 = []byte{0x02, 0x03, 0x04}
@@ -157,7 +157,7 @@ func TestStoreBolt(t *testing.T) {
 func TestStore_Cursor(t *testing.T) {
 	tmp := t.TempDir()
 	ctx := context.Background()
-	l := test.Logger(t)
+	l := testlogger.New(t)
 	dbStore, err := NewBoltStore(l, tmp, nil)
 	require.NoError(t, err)
 	defer func() {

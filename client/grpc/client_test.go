@@ -12,17 +12,19 @@ import (
 
 	"github.com/drand/drand/common/scheme"
 	"github.com/drand/drand/test/mock"
+	"github.com/drand/drand/test/testlogger"
 )
 
 func TestClient(t *testing.T) {
 	sch := scheme.GetSchemeFromEnv()
-	l, server := mock.NewMockGRPCPublicServer(t, "localhost:0", false, sch)
+	lg := testlogger.New(t)
+	l, server := mock.NewMockGRPCPublicServer(t, lg, "localhost:0", false, sch)
 	addr := l.Addr()
 
 	go l.Start()
 	defer l.Stop(context.Background())
 
-	c, err := New(addr, "", true, []byte(""))
+	c, err := New(lg, addr, "", true, []byte(""))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,13 +67,14 @@ func TestClient(t *testing.T) {
 
 func TestClientClose(t *testing.T) {
 	sch := scheme.GetSchemeFromEnv()
-	l, _ := mock.NewMockGRPCPublicServer(t, "localhost:0", false, sch)
+	lg := testlogger.New(t)
+	l, _ := mock.NewMockGRPCPublicServer(t, lg, "localhost:0", false, sch)
 	addr := l.Addr()
 
 	go l.Start()
 	defer l.Stop(context.Background())
 
-	c, err := New(addr, "", true, []byte(""))
+	c, err := New(lg, addr, "", true, []byte(""))
 	if err != nil {
 		t.Fatal(err)
 	}

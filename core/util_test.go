@@ -25,6 +25,7 @@ import (
 	"github.com/drand/drand/net"
 	"github.com/drand/drand/protobuf/drand"
 	"github.com/drand/drand/test"
+	"github.com/drand/drand/test/testlogger"
 	"github.com/drand/kyber/share/dkg"
 )
 
@@ -133,6 +134,8 @@ func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beacon
 		}
 	}
 
+	l := testlogger.New(t)
+
 	for i := 0; i < n; i++ {
 		s := test.NewKeyStore()
 
@@ -155,13 +158,14 @@ func BatchNewDrand(t *testing.T, n int, insecure bool, sch scheme.Scheme, beacon
 
 		confOptions = append(confOptions,
 			WithControlPort(ports[i]),
-			WithLogLevel(test.LogLevel(t), false))
+			WithLogLevel(testlogger.Level(t), false),
+		)
 		// add options in last so it overwrites the default
 		confOptions = append(confOptions, opts...)
 
 		t.Logf("Creating node %d", i)
 
-		daemon, err := NewDrandDaemon(NewConfig(confOptions...))
+		daemon, err := NewDrandDaemon(NewConfig(l, confOptions...))
 		assert.NoError(t, err)
 
 		bp, err := daemon.InstantiateBeaconProcess(beaconID, s)
@@ -278,7 +282,7 @@ func (d *DrandTestScenario) RunDKG() *key.Group {
 	secret := "thisisdkg"
 
 	leaderNode := d.nodes[0]
-	controlClient, err := net.NewControlClient(leaderNode.drand.opts.controlPort)
+	controlClient, err := net.NewControlClient(leaderNode.drand.log, leaderNode.drand.opts.controlPort)
 	required := require.New(d.t)
 	required.NoError(err)
 
@@ -311,7 +315,7 @@ func (d *DrandTestScenario) RunDKG() *key.Group {
 
 		// We need to make sure the daemon is running before continuing
 		d.waitFor(d.t, controlClient, 10, func(r *drand.StatusResponse) bool {
-			/// XXX: maybe needs to be changed if running and started aren't both necessary, using "isStarted" could maybe work too
+			// / XXX: maybe needs to be changed if running and started aren't both necessary, using "isStarted" could maybe work too
 			return r.Beacon.IsRunning
 		})
 		d.t.Logf("[DEBUG] leader node %s Status: isRunning", leaderNode.GetAddr())
@@ -334,7 +338,7 @@ func (d *DrandTestScenario) RunDKG() *key.Group {
 
 			d.t.Logf("[RunDKG] Node %d (%s) DKG init", idx+1, n.GetAddr())
 
-			client, err := net.NewControlClient(n.drand.opts.controlPort)
+			client, err := net.NewControlClient(n.drand.log, n.drand.opts.controlPort)
 			if err != nil {
 				errDetector <- err
 				return
@@ -354,7 +358,7 @@ func (d *DrandTestScenario) RunDKG() *key.Group {
 
 			// We need to make sure the daemon is running before continuing
 			d.waitFor(d.t, client, 10, func(r *drand.StatusResponse) bool {
-				/// XXX: maybe needs to be changed if running and started aren't both necessary, using "isStarted" could maybe work too
+				// / XXX: maybe needs to be changed if running and started aren't both necessary, using "isStarted" could maybe work too
 				return r.Beacon.IsRunning
 			})
 			d.t.Logf("[DEBUG] follower node %s Status: isRunning", n.GetAddr())
@@ -433,7 +437,7 @@ func (d *DrandTestScenario) StopMockNode(nodeAddr string, newGroup bool) {
 	dr.Stop(context.Background())
 	d.t.Logf("[drand] stop %s", dr.priv.Public.Address())
 
-	controlClient, err := net.NewControlClient(dr.opts.controlPort)
+	controlClient, err := net.NewControlClient(dr.log, dr.opts.controlPort)
 	require.NoError(d.t, err)
 
 	retryCount := 1
@@ -510,7 +514,7 @@ func (d *DrandTestScenario) CheckPublicBeacon(nodeAddress string, newGroup bool)
 	node := d.GetMockNode(nodeAddress, newGroup)
 	dr := node.drand
 
-	client := net.NewGrpcClientFromCertManager(dr.opts.certmanager, dr.opts.grpcOpts...)
+	client := net.NewGrpcClientFromCertManager(dr.log, dr.opts.certmanager, dr.opts.grpcOpts...)
 	resp, err := client.PublicRand(context.TODO(), test.NewTLSPeer(dr.priv.Public.Addr), &drand.PublicRandRequest{})
 
 	require.NoError(d.t, err)
@@ -554,7 +558,7 @@ func (d *DrandTestScenario) SetupNewNodes(t *testing.T, newNodes int) []*MockNod
 func (d *DrandTestScenario) WaitUntilRound(t *testing.T, node *MockNode, round uint64) error {
 	counter := 0
 
-	newClient, err := net.NewControlClient(node.drand.opts.controlPort)
+	newClient, err := net.NewControlClient(node.drand.log, node.drand.opts.controlPort)
 	require.NoError(t, err)
 
 	for {
@@ -579,7 +583,7 @@ func (d *DrandTestScenario) WaitUntilRound(t *testing.T, node *MockNode, round u
 func (d *DrandTestScenario) WaitUntilChainIsServing(t *testing.T, node *MockNode) error {
 	counter := 0
 
-	newClient, err := net.NewControlClient(node.drand.opts.controlPort)
+	newClient, err := net.NewControlClient(node.drand.log, node.drand.opts.controlPort)
 	require.NoError(t, err)
 
 	for {
@@ -608,7 +612,7 @@ func (d *DrandTestScenario) runNodeReshare(n *MockNode, errCh chan error, force 
 	leader := d.nodes[0]
 
 	// instruct to be ready for resharing
-	client, err := net.NewControlClient(n.drand.opts.controlPort)
+	client, err := net.NewControlClient(n.drand.log, n.drand.opts.controlPort)
 	require.NoError(d.t, err)
 
 	d.t.Logf("[reshare:node] init reshare")
@@ -737,7 +741,7 @@ func (d *DrandTestScenario) RunReshare(t *testing.T, c *reshareConfig) (*key.Gro
 	leader.drand.dkgBoardSetup = broadcastSetup
 
 	// wait until leader is listening
-	controlClient, err := net.NewControlClient(leader.drand.opts.ControlPort())
+	controlClient, err := net.NewControlClient(leader.drand.log, leader.drand.opts.ControlPort())
 	require.NoError(t, err)
 
 	// first run the leader, then the other nodes will send their PK to the

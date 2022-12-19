@@ -13,6 +13,7 @@ import (
 	dhttp "github.com/drand/drand/http"
 	"github.com/drand/drand/protobuf/drand"
 	"github.com/drand/drand/test/mock"
+	"github.com/drand/drand/test/testlogger"
 )
 
 // NewMockHTTPPublicServer creates a mock drand HTTP server for testing.
@@ -23,7 +24,8 @@ func NewMockHTTPPublicServer(t *testing.T, badSecondRound bool, sch scheme.Schem
 	client := core.Proxy(server)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	handler, err := dhttp.New(ctx, "", nil)
+	lg := testlogger.New(t)
+	handler, err := dhttp.New(ctx, "", lg)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -363,9 +363,17 @@ var appCommands = []*cli.Command{
 			storageTypeFlag, pgDSNFlag),
 		Action: func(c *cli.Context) error {
 			banner()
-			return startCmd(c)
+			level := logLevel(c)
+			l := log.NewLogger(nil, level).
+				Named("startCmd")
+			return startCmd(c, l)
 		},
-		Before: runMigration,
+		Before: func(c *cli.Context) error {
+			level := logLevel(c)
+			l := log.NewLogger(nil, level).
+				Named("runMigrationCmd")
+			return runMigration(c, l)
+		},
 	},
 	{
 		Name:  "stop",
@@ -373,7 +381,10 @@ var appCommands = []*cli.Command{
 		Flags: toArray(controlFlag, beaconIDFlag),
 		Action: func(c *cli.Context) error {
 			banner()
-			return stopDaemon(c)
+			level := logLevel(c)
+			l := log.NewLogger(nil, level).
+				Named("stopDaemon")
+			return stopDaemon(c, l)
 		},
 	},
 	{
@@ -386,21 +397,34 @@ var appCommands = []*cli.Command{
 			schemeFlag, beaconIDFlag),
 		Action: func(c *cli.Context) error {
 			banner()
-			return shareCmd(c)
+			level := logLevel(c)
+			l := log.NewLogger(nil, level).
+				Named("shareCmd")
+			return shareCmd(c, l)
 		},
 	},
 	{
-		Name:   "load",
-		Usage:  "Launch a sharing protocol from filesystem",
-		Flags:  toArray(controlFlag, beaconIDFlag, insecureFlag),
-		Action: loadCmd,
+		Name:  "load",
+		Usage: "Launch a sharing protocol from filesystem",
+		Flags: toArray(controlFlag, beaconIDFlag, insecureFlag),
+		Action: func(c *cli.Context) error {
+			level := logLevel(c)
+			l := log.NewLogger(nil, level).
+				Named("loadCmd")
+			return loadCmd(c, l)
+		},
 	},
 	{
 		Name:  "sync",
 		Usage: "sync your local randomness chain with other nodes and validate your local beacon chain",
 		Flags: toArray(folderFlag, controlFlag, hashInfoNoReq, syncNodeFlag,
 			tlsCertFlag, insecureFlag, upToFlag, beaconIDFlag, followFlag),
-		Action: syncCmd,
+		Action: func(c *cli.Context) error {
+			level := logLevel(c)
+			l := log.NewLogger(nil, level).
+				Named("syncCmd")
+			return syncCmd(c, l)
+		},
 	},
 	{
 		Name: "generate-keypair",
@@ -410,7 +434,11 @@ var appCommands = []*cli.Command{
 		Flags:     toArray(controlFlag, folderFlag, insecureFlag, beaconIDFlag),
 		Action: func(c *cli.Context) error {
 			banner()
-			err := keygenCmd(c)
+			level := logLevel(c)
+			l := log.NewLogger(nil, level).
+				Named("generateKeyPairCmd")
+
+			err := keygenCmd(c, l)
 
 			// If keys were generated successfully, daemon needs to load them
 			// In other to load them, we run LoadBeacon cmd.
@@ -418,7 +446,7 @@ var appCommands = []*cli.Command{
 			// TIP: If an error is found, it may indicate daemon is not running. If that is the case, keys will be loaded
 			// on drand startup.
 			if err == nil {
-				err2 := loadCmd(c)
+				err2 := loadCmd(c, l)
 				if err2 != nil {
 					fmt.Fprintf(os.Stdout, "Keys couldn't be loaded on drand daemon. If it is not running, "+
 						"these new keys will loaded on startup. Err: %s", err2)
@@ -426,7 +454,12 @@ var appCommands = []*cli.Command{
 			}
 			return err
 		},
-		Before: checkMigration,
+		Before: func(c *cli.Context) error {
+			level := logLevel(c)
+			l := log.NewLogger(nil, level).
+				Named("generateKeyPairCmd")
+			return checkMigration(c, l)
+		},
 	},
 
 	{
@@ -443,15 +476,25 @@ var appCommands = []*cli.Command{
 					"beacon via TLS and falls back to plaintext communication " +
 					"if the contacted node has not activated TLS in which case " +
 					"it prints a warning.\n",
-				Flags:  toArray(tlsCertFlag, insecureFlag, roundFlag, nodeFlag),
-				Action: getPublicRandomness,
+				Flags: toArray(tlsCertFlag, insecureFlag, roundFlag, nodeFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("getPublicRandomness")
+					return getPublicRandomness(c, l)
+				},
 			},
 			{
 				Name:      "chain-info",
 				Usage:     "Get the binding chain information that this node participates to",
 				ArgsUsage: "`ADDRESS1` `ADDRESS2` ... provides the addresses of the node to try to contact to.",
 				Flags:     toArray(tlsCertFlag, insecureFlag, hashOnly, hashInfoNoReq),
-				Action:    getChainInfo,
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("getChainInfo")
+					return getChainInfo(c, l)
+				},
 			},
 		},
 	},
@@ -465,8 +508,13 @@ var appCommands = []*cli.Command{
 					" in the group for accessibility over the gRPC communication. If the node " +
 					" is not running behind TLS, you need to pass the tls-disable flag. You can " +
 					"also check a whole group's connectivity with the group flag.",
-				Flags:  toArray(groupFlag, certsDirFlag, insecureFlag, verboseFlag, beaconIDFlag),
-				Action: checkConnection,
+				Flags: toArray(groupFlag, certsDirFlag, insecureFlag, verboseFlag, beaconIDFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("checkConnection")
+					return checkConnection(c, l)
+				},
 				Before: checkArgs,
 			},
 			{
@@ -474,61 +522,121 @@ var appCommands = []*cli.Command{
 				Usage: "Ask for the statuses of remote nodes indicated by " +
 					"`ADDRESS1 ADDRESS2 ADDRESS3...`, including the network " +
 					"visibility over the rest of the addresses given.",
-				Flags:  toArray(controlFlag, jsonFlag, beaconIDFlag),
-				Action: remoteStatusCmd,
+				Flags: toArray(controlFlag, jsonFlag, beaconIDFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("remoteStatusCmd")
+					return remoteStatusCmd(c, l)
+				},
 			},
 			{
-				Name:   "ping",
-				Usage:  "Pings the daemon checking its state\n",
-				Flags:  toArray(controlFlag),
-				Action: pingpongCmd,
+				Name:  "ping",
+				Usage: "Pings the daemon checking its state\n",
+				Flags: toArray(controlFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("pingpongCmd")
+					return pingpongCmd(c, l)
+				},
 			},
 			{
-				Name:   "list-schemes",
-				Usage:  "List all scheme ids available to use\n",
-				Flags:  toArray(controlFlag),
-				Action: schemesCmd,
+				Name:  "list-schemes",
+				Usage: "List all scheme ids available to use\n",
+				Flags: toArray(controlFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("schemesCmd")
+					return schemesCmd(c, l)
+				},
 			},
 			{
-				Name:   "status",
-				Usage:  "Get the status of many modules of running the daemon\n",
-				Flags:  toArray(controlFlag, jsonFlag, beaconIDFlag, allBeaconsFlag, listIdsFlag),
-				Action: statusCmd,
+				Name:  "status",
+				Usage: "Get the status of many modules of running the daemon\n",
+				Flags: toArray(controlFlag, jsonFlag, beaconIDFlag, allBeaconsFlag, listIdsFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("statusCmd")
+					return statusCmd(c, l)
+				},
 			},
 			{
-				Name:   "migrate",
-				Usage:  "Migrate folder structure to support multi-beacon drand. You DO NOT have to run it while drand is running.\n",
-				Flags:  toArray(folderFlag),
-				Action: migrateCmd,
+				Name:  "migrate",
+				Usage: "Migrate folder structure to support multi-beacon drand. You DO NOT have to run it while drand is running.\n",
+				Flags: toArray(folderFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("migrateCmd")
+					return migrateCmd(c, l)
+				},
 				Before: checkArgs,
 			},
 			{
-				Name:   "reset",
-				Usage:  "Resets the local distributed information (share, group file and random beacons). It KEEPS the private/public key pair.",
-				Flags:  toArray(folderFlag, controlFlag, beaconIDFlag, allBeaconsFlag),
-				Action: resetCmd,
-				Before: checkMigration,
+				Name:  "reset",
+				Usage: "Resets the local distributed information (share, group file and random beacons). It KEEPS the private/public key pair.",
+				Flags: toArray(folderFlag, controlFlag, beaconIDFlag, allBeaconsFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("resetCmd")
+					return resetCmd(c, l)
+				},
+				Before: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("resetCmd")
+					return checkMigration(c, l)
+				},
 			},
 			{
 				Name: "del-beacon",
 				Usage: "Delete all beacons from the given `ROUND` number until the head of the chain. " +
 					" You MUST restart the daemon after that command.",
-				Flags:  toArray(folderFlag, beaconIDFlag, allBeaconsFlag),
-				Action: deleteBeaconCmd,
-				Before: checkMigration,
+				Flags: toArray(folderFlag, beaconIDFlag, allBeaconsFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("deleteBeaconCmd")
+					return deleteBeaconCmd(c, l)
+				},
+				Before: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("deleteBeaconCmd")
+					return checkMigration(c, l)
+				},
 			},
 			{
-				Name:   "self-sign",
-				Usage:  "Signs the public identity of this node. Needed for backward compatibility with previous versions.",
-				Flags:  toArray(folderFlag, beaconIDFlag),
-				Action: selfSign,
-				Before: checkMigration,
+				Name:  "self-sign",
+				Usage: "Signs the public identity of this node. Needed for backward compatibility with previous versions.",
+				Flags: toArray(folderFlag, beaconIDFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("selfSignCmd")
+					return selfSign(c, l)
+				},
+				Before: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("selfSignCmd")
+					return checkMigration(c, l)
+				},
 			},
 			{
-				Name:   "backup",
-				Usage:  "backs up the primary drand database to a secondary location.",
-				Flags:  toArray(outFlag, controlFlag, beaconIDFlag),
-				Action: backupDBCmd,
+				Name:  "backup",
+				Usage: "backs up the primary drand database to a secondary location.",
+				Flags: toArray(outFlag, controlFlag, beaconIDFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("backupDBCmd")
+					return backupDBCmd(c, l)
+				},
 			},
 		},
 	},
@@ -543,36 +651,61 @@ var appCommands = []*cli.Command{
 		Flags: toArray(folderFlag, controlFlag),
 		Subcommands: []*cli.Command{
 			{
-				Name:   "share",
-				Usage:  "shows the private share\n",
-				Flags:  toArray(controlFlag, beaconIDFlag),
-				Action: showShareCmd,
+				Name:  "share",
+				Usage: "shows the private share\n",
+				Flags: toArray(controlFlag, beaconIDFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("showShareCmd")
+					return showShareCmd(c, l)
+				},
 			},
 			{
 				Name: "group",
 				Usage: "shows the current group.toml used. The group.toml " +
 					"may contain the distributed public key if the DKG has been " +
 					"ran already.\n",
-				Flags:  toArray(outFlag, controlFlag, hashOnly, beaconIDFlag),
-				Action: showGroupCmd,
+				Flags: toArray(outFlag, controlFlag, hashOnly, beaconIDFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("showGroupCmd")
+					return showGroupCmd(c, l)
+				},
 			},
 			{
-				Name:   "chain-info",
-				Usage:  "shows the chain information this node is participating to",
-				Flags:  toArray(controlFlag, hashOnly, beaconIDFlag),
-				Action: showChainInfo,
+				Name:  "chain-info",
+				Usage: "shows the chain information this node is participating to",
+				Flags: toArray(controlFlag, hashOnly, beaconIDFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("showChainInfoCmd")
+					return showChainInfo(c, l)
+				},
 			},
 			{
-				Name:   "private",
-				Usage:  "shows the long-term private key of a node.\n",
-				Flags:  toArray(controlFlag, beaconIDFlag),
-				Action: showPrivateCmd,
+				Name:  "private",
+				Usage: "shows the long-term private key of a node.\n",
+				Flags: toArray(controlFlag, beaconIDFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("showPrivateCmd")
+					return showPrivateCmd(c, l)
+				},
 			},
 			{
-				Name:   "public",
-				Usage:  "shows the long-term public key of a node.\n",
-				Flags:  toArray(controlFlag, beaconIDFlag),
-				Action: showPublicCmd,
+				Name:  "public",
+				Usage: "shows the long-term public key of a node.\n",
+				Flags: toArray(controlFlag, beaconIDFlag),
+				Action: func(c *cli.Context) error {
+					level := logLevel(c)
+					l := log.NewLogger(nil, level).
+						Named("showPublicCmd")
+					return showPublicCmd(c, l)
+				},
 			},
 		},
 	},
@@ -619,8 +752,8 @@ func CLI() *cli.App {
 	return app
 }
 
-func resetCmd(c *cli.Context) error {
-	conf := contextToConfig(c)
+func resetCmd(c *cli.Context, l log.Logger) error {
+	conf := contextToConfig(c, l)
 
 	fmt.Fprintf(output, "You are about to delete your local share, group file and generated random beacons. "+
 		"Are you sure you wish to perform this operation? [y/N]")
@@ -637,24 +770,24 @@ func resetCmd(c *cli.Context) error {
 		return nil
 	}
 
-	stores, err := getKeyStores(c)
+	stores, err := getKeyStores(c, l)
 	if err != nil {
 		fmt.Fprintf(output, "drand: err reading beacons database: %v\n", err)
 		os.Exit(1)
 	}
 
-	for key, store := range stores {
+	for beaconID, store := range stores {
 		if err := store.Reset(); err != nil {
-			fmt.Fprintf(output, "drand: beacon id [%s] - err reseting key store: %v\n", key, err)
+			fmt.Fprintf(output, "drand: beacon id [%s] - err reseting key store: %v\n", beaconID, err)
 			os.Exit(1)
 		}
 
-		if err := os.RemoveAll(path.Join(conf.ConfigFolderMB(), key)); err != nil {
-			fmt.Fprintf(output, "drand: beacon id [%s] - err reseting beacons database: %v\n", key, err)
+		if err := os.RemoveAll(path.Join(conf.ConfigFolderMB(), beaconID)); err != nil {
+			fmt.Fprintf(output, "drand: beacon id [%s] - err reseting beacons database: %v\n", beaconID, err)
 			os.Exit(1)
 		}
 
-		fmt.Printf("drand: beacon id [%s] - database reset\n", key)
+		fmt.Printf("drand: beacon id [%s] - database reset\n", beaconID)
 	}
 
 	return nil
@@ -685,12 +818,12 @@ func askPort(c *cli.Context) string {
 	}
 }
 
-func runMigration(c *cli.Context) error {
+func runMigration(c *cli.Context, l log.Logger) error {
 	if err := checkArgs(c); err != nil {
 		return err
 	}
 
-	config := contextToConfig(c)
+	config := contextToConfig(c, l)
 
 	if err := migration.MigrateSBFolderStructure(config.ConfigFolder()); err != nil {
 		return err
@@ -699,12 +832,12 @@ func runMigration(c *cli.Context) error {
 	return nil
 }
 
-func checkMigration(c *cli.Context) error {
+func checkMigration(c *cli.Context, l log.Logger) error {
 	if err := checkArgs(c); err != nil {
 		return err
 	}
 
-	config := contextToConfig(c)
+	config := contextToConfig(c, l)
 
 	if isPresent := migration.CheckSBFolderStructure(config.ConfigFolder()); isPresent {
 		return fmt.Errorf("single-beacon drand folder structure was not migrated, " +
@@ -727,7 +860,7 @@ func testWindows(c *cli.Context) error {
 	return nil
 }
 
-func keygenCmd(c *cli.Context) error {
+func keygenCmd(c *cli.Context, l log.Logger) error {
 	args := c.Args()
 	if !args.Present() {
 		return errors.New("missing drand address in argument. Abort")
@@ -749,7 +882,7 @@ func keygenCmd(c *cli.Context) error {
 		priv = key.NewTLSKeyPair(addr)
 	}
 
-	config := contextToConfig(c)
+	config := contextToConfig(c, l)
 	beaconID := getBeaconID(c)
 	fileStore := key.NewFileStore(config.ConfigFolderMB(), beaconID)
 
@@ -813,7 +946,7 @@ func getThreshold(c *cli.Context) (int, error) {
 	return threshold, nil
 }
 
-func checkConnection(c *cli.Context) error {
+func checkConnection(c *cli.Context, lg log.Logger) error {
 	var names []string
 	var beaconID string
 
@@ -846,7 +979,7 @@ func checkConnection(c *cli.Context) error {
 		return fmt.Errorf("drand: check-group expects a list of identities or %s flag", groupFlag.Name)
 	}
 
-	conf := contextToConfig(c)
+	conf := contextToConfig(c, lg)
 	isVerbose := c.IsSet(verboseFlag.Name)
 	allGood := true
 	isIdentityCheck := c.IsSet(groupFlag.Name) || c.IsSet(beaconIDFlag.Name)
@@ -855,9 +988,9 @@ func checkConnection(c *cli.Context) error {
 	for _, address := range names {
 		var err error
 		if isIdentityCheck {
-			err = checkIdentityAddress(conf, address, !c.Bool(insecureFlag.Name), beaconID)
+			err = checkIdentityAddress(lg, conf, address, !c.Bool(insecureFlag.Name), beaconID)
 		} else {
-			err = remotePingToNode(address, !c.Bool(insecureFlag.Name))
+			err = remotePingToNode(lg, address, !c.Bool(insecureFlag.Name))
 		}
 
 		if err != nil {
@@ -878,9 +1011,9 @@ func checkConnection(c *cli.Context) error {
 	return nil
 }
 
-func checkIdentityAddress(conf *core.Config, addr string, tls bool, beaconID string) error {
+func checkIdentityAddress(lg log.Logger, conf *core.Config, addr string, tls bool, beaconID string) error {
 	peer := net.CreatePeer(addr, tls)
-	client := net.NewGrpcClientFromCertManager(conf.Certs())
+	client := net.NewGrpcClientFromCertManager(lg, conf.Certs())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -904,8 +1037,8 @@ func checkIdentityAddress(conf *core.Config, addr string, tls bool, beaconID str
 
 // deleteBeaconCmd deletes all beacon in the database from the given round until
 // the head of the chain
-func deleteBeaconCmd(c *cli.Context) error {
-	conf := contextToConfig(c)
+func deleteBeaconCmd(c *cli.Context, l log.Logger) error {
+	conf := contextToConfig(c, l)
 
 	startRoundStr := c.Args().First()
 	sr, err := strconv.Atoi(startRoundStr)
@@ -915,18 +1048,12 @@ func deleteBeaconCmd(c *cli.Context) error {
 
 	startRound := uint64(sr)
 
-	stores, err := getDBStoresPaths(c)
+	stores, err := getDBStoresPaths(c, l)
 	if err != nil {
 		return err
 	}
 
-	isVerbose := c.IsSet(verboseFlag.Name)
-
-	level := log.LogError
-	if isVerbose {
-		level = log.LogDebug
-	}
-	l := log.NewLogger(nil, level)
+	verbose := isVerbose(c)
 
 	ctx := c.Context
 
@@ -950,7 +1077,7 @@ func deleteBeaconCmd(c *cli.Context) error {
 			if startRound > lastBeacon.Round {
 				return fmt.Errorf("beacon id [%s] - given round is ahead of the chain: %d", beaconID, lastBeacon.Round)
 			}
-			if isVerbose {
+			if verbose {
 				fmt.Printf("beacon id [%s] -  planning to delete %d beacons \n", beaconID, (lastBeacon.Round - startRound))
 			}
 
@@ -959,7 +1086,7 @@ func deleteBeaconCmd(c *cli.Context) error {
 				if err != nil {
 					return fmt.Errorf("beacon id [%s] - error deleting round %d: %w", beaconID, round, err)
 				}
-				if isVerbose {
+				if verbose {
 					fmt.Printf("beacon id [%s] - deleted beacon round %d \n", beaconID, round)
 				}
 			}
@@ -968,6 +1095,18 @@ func deleteBeaconCmd(c *cli.Context) error {
 	}
 
 	return err
+}
+
+func isVerbose(c *cli.Context) bool {
+	return c.IsSet(verboseFlag.Name)
+}
+
+func logLevel(c *cli.Context) int {
+	if isVerbose(c) {
+		return log.LogDebug
+	}
+
+	return log.LogError
 }
 
 func toArray(flags ...cli.Flag) []cli.Flag {
@@ -1002,7 +1141,7 @@ func checkArgs(c *cli.Context) error {
 	return nil
 }
 
-func contextToConfig(c *cli.Context) *core.Config {
+func contextToConfig(c *cli.Context, l log.Logger) *core.Config {
 	var opts []core.ConfigOption
 	version := common.GetAppVersion()
 
@@ -1057,7 +1196,7 @@ func contextToConfig(c *cli.Context) *core.Config {
 		opts = append(opts, core.WithDBStorageEngine(chain.BoltDB))
 	}
 
-	conf := core.NewConfig(opts...)
+	conf := core.NewConfig(l, opts...)
 	return conf
 }
 
@@ -1110,8 +1249,8 @@ func getBeaconID(c *cli.Context) string {
 	return common.GetCanonicalBeaconID(c.String(beaconIDFlag.Name))
 }
 
-func getDBStoresPaths(c *cli.Context) (map[string]string, error) {
-	conf := contextToConfig(c)
+func getDBStoresPaths(c *cli.Context, l log.Logger) (map[string]string, error) {
+	conf := contextToConfig(c, l)
 	stores := make(map[string]string)
 
 	if c.IsSet(allBeaconsFlag.Name) {
@@ -1138,8 +1277,8 @@ func getDBStoresPaths(c *cli.Context) (map[string]string, error) {
 	return stores, nil
 }
 
-func getKeyStores(c *cli.Context) (map[string]key.Store, error) {
-	conf := contextToConfig(c)
+func getKeyStores(c *cli.Context, l log.Logger) (map[string]key.Store, error) {
+	conf := contextToConfig(c, l)
 
 	if c.IsSet(allBeaconsFlag.Name) {
 		return key.NewFileStores(conf.ConfigFolderMB())

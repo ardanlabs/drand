@@ -22,6 +22,7 @@ import (
 	"github.com/drand/drand/protobuf/common"
 	"github.com/drand/drand/protobuf/drand"
 	"github.com/drand/drand/test"
+	"github.com/drand/drand/test/testlogger"
 )
 
 func setFDLimit(t *testing.T) {
@@ -461,7 +462,7 @@ func TestRunDKGReshareTimeout(t *testing.T) {
 	root := dt.resharedNodes[0].drand
 	rootID := root.priv.Public
 	cm := root.opts.certmanager
-	client := net.NewGrpcClientFromCertManager(cm)
+	client := net.NewGrpcClientFromCertManager(testlogger.New(t), cm)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	resp, err := client.PublicRand(ctx, rootID, new(drand.PublicRandRequest))
@@ -514,7 +515,7 @@ func TestRunDKGResharePreempt(t *testing.T) {
 	// old root: oldNode.Index leater: leader.addr
 	oldDone := make(chan error, 1)
 	go func() {
-		client, err := net.NewControlClient(dt.nodes[0].drand.opts.controlPort)
+		client, err := net.NewControlClient(dt.nodes[0].drand.log, dt.nodes[0].drand.opts.controlPort)
 		require.NoError(t, err)
 
 		t.Log("Init reshare on leader")
@@ -594,9 +595,10 @@ func TestDrandPublicChainInfo(t *testing.T) {
 
 	group := dt.RunDKG()
 
-	chainInfo := chain.NewChainInfo(group)
+	lg := testlogger.New(t)
+	chainInfo := chain.NewChainInfo(lg, group)
 	certManager := dt.nodes[0].drand.opts.certmanager
-	client := NewGrpcClientFromCert(chainInfo.Hash(), certManager)
+	client := NewGrpcClientFromCert(lg, chainInfo.Hash(), certManager)
 
 	for i, node := range dt.nodes {
 		d := node.drand
@@ -668,7 +670,7 @@ func TestDrandPublicRand(t *testing.T) {
 	}
 
 	cm := root.opts.certmanager
-	client := net.NewGrpcClientFromCertManager(cm)
+	client := net.NewGrpcClientFromCertManager(testlogger.New(t), cm)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -732,7 +734,7 @@ func TestDrandPublicStream(t *testing.T) {
 	}
 
 	cm := root.drand.opts.certmanager
-	client := net.NewGrpcClientFromCertManager(cm)
+	client := net.NewGrpcClientFromCertManager(testlogger.New(t), cm)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -844,7 +846,7 @@ func TestDrandFollowChain(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	client := net.NewGrpcClientFromCertManager(dt.nodes[0].drand.opts.certmanager)
+	client := net.NewGrpcClientFromCertManager(dt.nodes[0].drand.log, dt.nodes[0].drand.opts.certmanager)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -854,11 +856,11 @@ func TestDrandFollowChain(t *testing.T) {
 
 	// TEST setup a new node and fetch history
 	newNode := dt.SetupNewNodes(t, 1)[0]
-	newClient, err := net.NewControlClient(newNode.drand.opts.controlPort)
+	newClient, err := net.NewControlClient(newNode.drand.log, newNode.drand.opts.controlPort)
 	require.NoError(t, err)
 
 	addrToFollow := []string{rootID.Address()}
-	hash := fmt.Sprintf("%x", chain.NewChainInfo(group).Hash())
+	hash := fmt.Sprintf("%x", chain.NewChainInfo(testlogger.New(t), group).Hash())
 	tls := true
 
 	// First try with an invalid hash info
@@ -960,7 +962,7 @@ func TestDrandCheckChain(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	client := net.NewGrpcClientFromCertManager(dt.nodes[0].drand.opts.certmanager)
+	client := net.NewGrpcClientFromCertManager(dt.nodes[0].drand.log, dt.nodes[0].drand.opts.certmanager)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// get last round first
@@ -970,7 +972,7 @@ func TestDrandCheckChain(t *testing.T) {
 
 	t.Log(current)
 
-	ctrlClient, err := net.NewControlClient(dt.nodes[0].drand.opts.controlPort)
+	ctrlClient, err := net.NewControlClient(dt.nodes[0].drand.log, dt.nodes[0].drand.opts.controlPort)
 	require.NoError(t, err)
 	tls := true
 
@@ -983,7 +985,7 @@ func TestDrandCheckChain(t *testing.T) {
 	// Next trying with a fully valid chain
 	cancel()
 	ctx, cancel = context.WithCancel(context.Background())
-	hash := fmt.Sprintf("%x", chain.NewChainInfo(group).Hash())
+	hash := fmt.Sprintf("%x", chain.NewChainInfo(testlogger.New(t), group).Hash())
 	addrToFollow := []string{rootID.Address()}
 	upTo := uint64(5)
 

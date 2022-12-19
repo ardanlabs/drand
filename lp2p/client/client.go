@@ -36,9 +36,9 @@ func (c *Client) SetLog(l log.Logger) {
 
 // WithPubsub provides an option for integrating pubsub notification
 // into a drand client.
-func WithPubsub(ps *pubsub.PubSub) client.Option {
+func WithPubsub(l log.Logger, ps *pubsub.PubSub) client.Option {
 	return client.WithWatcher(func(info *chain.Info, cache client.Cache) (client.Watcher, error) {
-		c, err := NewWithPubsub(ps, info, cache)
+		c, err := NewWithPubsub(l, ps, info, cache)
 		if err != nil {
 			return nil, err
 		}
@@ -47,7 +47,7 @@ func WithPubsub(ps *pubsub.PubSub) client.Option {
 }
 
 // NewWithPubsub creates a gossip randomness client.
-func NewWithPubsub(ps *pubsub.PubSub, info *chain.Info, cache client.Cache) (*Client, error) {
+func NewWithPubsub(l log.Logger, ps *pubsub.PubSub, info *chain.Info, cache client.Cache) (*Client, error) {
 	if info == nil {
 		return nil, xerrors.Errorf("No chain supplied for joining")
 	}
@@ -56,7 +56,7 @@ func NewWithPubsub(ps *pubsub.PubSub, info *chain.Info, cache client.Cache) (*Cl
 	c := &Client{
 		cancel: cancel,
 		cache:  cache,
-		log:    log.DefaultLogger(),
+		log:    l,
 	}
 
 	chainHash := hex.EncodeToString(info.Hash())

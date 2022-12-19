@@ -17,10 +17,10 @@ import (
 const clientStartupTimeoutDefault = time.Second * 5
 
 // New Creates a client with specified configuration.
-func New(options ...Option) (Client, error) {
+func New(l log.Logger, options ...Option) (Client, error) {
 	cfg := clientConfig{
 		cacheSize: 32,
-		log:       log.DefaultLogger(),
+		log:       l,
 	}
 
 	for _, opt := range options {
@@ -28,13 +28,13 @@ func New(options ...Option) (Client, error) {
 			return nil, err
 		}
 	}
-	return makeClient(&cfg)
+	return makeClient(l, &cfg)
 }
 
 // Wrap provides a single entrypoint for wrapping a concrete client
 // implementation with configured aggregation, caching, and retry logic
-func Wrap(clients []Client, options ...Option) (Client, error) {
-	return New(append(options, From(clients...))...)
+func Wrap(l log.Logger, clients []Client, options ...Option) (Client, error) {
+	return New(l, append(options, From(clients...))...)
 }
 
 func trySetLog(c Client, l log.Logger) {
@@ -44,7 +44,7 @@ func trySetLog(c Client, l log.Logger) {
 }
 
 // makeClient creates a client from a configuration.
-func makeClient(cfg *clientConfig) (Client, error) {
+func makeClient(l log.Logger, cfg *clientConfig) (Client, error) {
 	if !cfg.insecure && cfg.chainHash == nil && cfg.chainInfo == nil {
 		return nil, errors.New("no root of trust specified")
 	}
@@ -92,12 +92,12 @@ func makeClient(cfg *clientConfig) (Client, error) {
 		}
 	}
 
-	c, err = makeOptimizingClient(cfg, verifiers, wc, cache)
+	c, err = makeOptimizingClient(l, cfg, verifiers, wc, cache)
 	if err != nil {
 		return nil, err
 	}
 
-	wa := newWatchAggregator(c, wc, cfg.autoWatch, cfg.autoWatchRetry)
+	wa := newWatchAggregator(l, c, wc, cfg.autoWatch, cfg.autoWatchRetry)
 	c = wa
 	trySetLog(c, cfg.log)
 
@@ -106,8 +106,8 @@ func makeClient(cfg *clientConfig) (Client, error) {
 	return attachMetrics(cfg, c)
 }
 
-func makeOptimizingClient(cfg *clientConfig, verifiers []Client, watcher Client, cache Cache) (Client, error) {
-	oc, err := newOptimizingClient(verifiers, 0, 0, 0, 0)
+func makeOptimizingClient(l log.Logger, cfg *clientConfig, verifiers []Client, watcher Client, cache Cache) (Client, error) {
+	oc, err := newOptimizingClient(l, verifiers, 0, 0, 0, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func makeOptimizingClient(cfg *clientConfig, verifiers []Client, watcher Client,
 	trySetLog(c, cfg.log)
 
 	if cfg.cacheSize > 0 {
-		c, err = NewCachingClient(c, cache)
+		c, err = NewCachingClient(l, c, cache)
 		if err != nil {
 			return nil, err
 		}

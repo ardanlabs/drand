@@ -14,6 +14,7 @@ import (
 
 	"github.com/drand/drand/common/scheme"
 	"github.com/drand/drand/key"
+	"github.com/drand/drand/log"
 	"github.com/drand/drand/net"
 	"github.com/drand/drand/protobuf/drand"
 	testnet "github.com/drand/drand/test/net"
@@ -274,7 +275,7 @@ func nextMockData(d *Data) *Data {
 }
 
 // NewMockGRPCPublicServer creates a listener that provides valid single-node randomness.
-func NewMockGRPCPublicServer(t *testing.T, bind string, badSecondRound bool, sch scheme.Scheme) (net.Listener, net.Service) {
+func NewMockGRPCPublicServer(t *testing.T, l log.Logger, bind string, badSecondRound bool, sch scheme.Scheme) (net.Listener, net.Service) {
 	d := generateMockData(sch)
 	testValid(d)
 
@@ -282,7 +283,7 @@ func NewMockGRPCPublicServer(t *testing.T, bind string, badSecondRound bool, sch
 	d.Scheme = sch
 
 	server := newMockServer(t, d)
-	listener, err := net.NewGRPCListenerForPrivate(context.Background(), bind, "", "", server, true)
+	listener, err := net.NewGRPCListenerForPrivate(context.Background(), l, bind, "", "", server, true)
 	if err != nil {
 		panic(err)
 	}

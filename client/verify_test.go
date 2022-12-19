@@ -8,9 +8,11 @@ import (
 	"github.com/drand/drand/client"
 	"github.com/drand/drand/client/test/result/mock"
 	"github.com/drand/drand/common/scheme"
+	"github.com/drand/drand/log"
+	"github.com/drand/drand/test/testlogger"
 )
 
-func mockClientWithVerifiableResults(n int) (client.Client, []mock.Result, error) {
+func mockClientWithVerifiableResults(l log.Logger, n int) (client.Client, []mock.Result, error) {
 	sch := scheme.GetSchemeFromEnv()
 
 	info, results := mock.VerifiableResults(n, sch)
@@ -20,6 +22,7 @@ func mockClientWithVerifiableResults(n int) (client.Client, []mock.Result, error
 	var err error
 
 	c, err = client.Wrap(
+		l,
 		[]client.Client{client.MockClientWithInfo(info), &mc},
 		client.WithChainInfo(info),
 		client.WithVerifiedResult(&results[0]),
@@ -41,7 +44,8 @@ func TestVerifyWithOldVerifiedResult(t *testing.T) {
 }
 
 func VerifyFuncTest(t *testing.T, clients, upTo int) {
-	c, results, err := mockClientWithVerifiableResults(clients)
+	l := testlogger.New(t)
+	c, results, err := mockClientWithVerifiableResults(l, clients)
 	if err != nil {
 		t.Fatal(err)
 	}

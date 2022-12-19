@@ -34,17 +34,19 @@ type grpcClient struct {
 	opts    []grpc.DialOption
 	timeout time.Duration
 	manager *CertManager
+	log     log.Logger
 }
 
 var defaultTimeout = 1 * time.Minute
 
 // NewGrpcClient returns an implementation of an InternalClient  and
 // ExternalClient using gRPC connections
-func NewGrpcClient(opts ...grpc.DialOption) Client {
+func NewGrpcClient(l log.Logger, opts ...grpc.DialOption) Client {
 	client := grpcClient{
 		opts:    opts,
 		conns:   make(map[string]*grpc.ClientConn),
 		timeout: defaultTimeout,
+		log:     l,
 	}
 	client.loadEnvironment()
 	return &client
@@ -52,16 +54,16 @@ func NewGrpcClient(opts ...grpc.DialOption) Client {
 
 // NewGrpcClientFromCertManager returns a Client using gRPC with the given trust
 // store of certificates.
-func NewGrpcClientFromCertManager(c *CertManager, opts ...grpc.DialOption) Client {
-	client := NewGrpcClient(opts...).(*grpcClient)
+func NewGrpcClientFromCertManager(l log.Logger, c *CertManager, opts ...grpc.DialOption) Client {
+	client := NewGrpcClient(l, opts...).(*grpcClient)
 	client.manager = c
 	return client
 }
 
 // NewGrpcClientWithTimeout returns a Client using gRPC using fixed timeout for
 // method calls.
-func NewGrpcClientWithTimeout(timeout time.Duration, opts ...grpc.DialOption) Client {
-	c := NewGrpcClient(opts...).(*grpcClient)
+func NewGrpcClientWithTimeout(l log.Logger, timeout time.Duration, opts ...grpc.DialOption) Client {
+	c := NewGrpcClient(l, opts...).(*grpcClient)
 	c.timeout = timeout
 	return c
 }
@@ -223,19 +225,19 @@ func (g *grpcClient) SyncChain(ctx context.Context, p Peer, in *drand.SyncReques
 		for {
 			reply, err := stream.Recv()
 			if errors.Is(err, io.EOF) {
-				log.DefaultLogger().Infow("", "grpc client", "chain sync", "error", "eof", "to", p.Address())
-				log.DefaultLogger().Debugw(" --- STREAM EOF")
+				g.log.Infow("", "grpc client", "chain sync", "error", "eof", "to", p.Address())
+				g.log.Debugw(" --- STREAM EOF")
 				return
 			}
 			if err != nil {
-				log.DefaultLogger().Infow("", "grpc client", "chain sync", "error", err, "to", p.Address())
-				log.DefaultLogger().Debugw(fmt.Sprintf("--- STREAM ERR: %s", err))
+				g.log.Infow("", "grpc client", "chain sync", "error", err, "to", p.Address())
+				g.log.Debugw(fmt.Sprintf("--- STREAM ERR: %s", err))
 				return
 			}
 			select {
 			case <-ctx.Done():
-				log.DefaultLogger().Infow("", "grpc client", "chain sync", "error", "context done", "to", p.Address())
-				log.DefaultLogger().Debugw(" --- STREAM CONTEXT DONE")
+				g.log.Infow("", "grpc client", "chain sync", "error", "context done", "to", p.Address())
+				g.log.Debugw(" --- STREAM CONTEXT DONE")
 				return
 			default:
 				resp <- reply
@@ -285,7 +287,7 @@ func (g *grpcClient) conn(p Peer) (*grpc.ClientConn, error) {
 	}
 
 	if !ok {
-		log.DefaultLogger().Debugw("", "grpc client", "initiating", "to", p.Address(), "tls", p.IsTLS())
+		g.log.Debugw("", "grpc client", "initiating", "to", p.Address(), "tls", p.IsTLS())
 		if !p.IsTLS() {
 			c, err = grpc.Dial(p.Address(), append(g.opts, grpc.WithTransportCredentials(insecure.NewCredentials()))...)
 			if err != nil {

@@ -91,15 +91,16 @@ var runCmd = &cli.Command{
 		metricsFlag,
 	}...),
 	Action: func(cctx *cli.Context) error {
+		lg := log.NewLogger(nil, log.DefaultLevel)
 		if cctx.IsSet(metricsFlag.Name) {
-			metricsListener := metrics.Start(cctx.String(metricsFlag.Name), pprof.WithProfile(), nil)
+			metricsListener := metrics.Start(lg, cctx.String(metricsFlag.Name), pprof.WithProfile(), nil)
 			defer metricsListener.Close()
 			if err := metrics.PrivateMetrics.Register(grpc_prometheus.DefaultClientMetrics); err != nil {
 				return err
 			}
 		}
 
-		c, err := lib.Create(cctx, cctx.IsSet(metricsFlag.Name))
+		c, err := lib.Create(cctx, lg, cctx.IsSet(metricsFlag.Name))
 		if err != nil {
 			return xerrors.Errorf("constructing client: %w", err)
 		}
@@ -121,7 +122,7 @@ var runCmd = &cli.Command{
 			IdentityPath: cctx.String(idFlag.Name),
 			Client:       c,
 		}
-		if _, err := lp2p.NewGossipRelayNode(log.DefaultLogger(), cfg); err != nil {
+		if _, err := lp2p.NewGossipRelayNode(lg, cfg); err != nil {
 			return err
 		}
 		<-chan int(nil)
@@ -133,13 +134,14 @@ var clientCmd = &cli.Command{
 	Name:  "client",
 	Flags: lib.ClientFlags,
 	Action: func(cctx *cli.Context) error {
-		c, err := lib.Create(cctx, false)
+		lg := log.NewLogger(nil, log.DefaultLevel)
+		c, err := lib.Create(cctx, lg, false)
 		if err != nil {
 			return xerrors.Errorf("constructing client: %w", err)
 		}
 
 		for rand := range c.Watch(context.Background()) {
-			log.DefaultLogger().Infow("", "client", "got randomness", "round", rand.Round(), "signature", rand.Signature()[:16])
+			lg.Infow("", "client", "got randomness", "round", rand.Round(), "signature", rand.Signature()[:16])
 		}
 
 		return nil
@@ -151,7 +153,8 @@ var idCmd = &cli.Command{
 	Usage: "prints the libp2p peer ID or creates one if it does not exist",
 	Flags: []cli.Flag{idFlag},
 	Action: func(cctx *cli.Context) error {
-		priv, err := lp2p.LoadOrCreatePrivKey(cctx.String(idFlag.Name), log.DefaultLogger())
+		lg := log.NewLogger(nil, log.DefaultLevel)
+		priv, err := lp2p.LoadOrCreatePrivKey(cctx.String(idFlag.Name), lg)
 		if err != nil {
 			return xerrors.Errorf("loading p2p key: %w", err)
 		}

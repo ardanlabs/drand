@@ -5,6 +5,7 @@ import (
 
 	"github.com/drand/drand/chain"
 	"github.com/drand/drand/key"
+	"github.com/drand/drand/log"
 	"github.com/drand/kyber/share"
 )
 
@@ -29,9 +30,9 @@ type cryptoStore struct {
 	group *key.Group
 }
 
-func newCryptoStore(currentGroup *key.Group, ks *key.Share) *cryptoStore {
+func newCryptoStore(l log.Logger, currentGroup *key.Group, ks *key.Share) *cryptoStore {
 	return &cryptoStore{
-		chain: chain.NewChainInfo(currentGroup),
+		chain: chain.NewChainInfo(l, currentGroup),
 		share: ks,
 		pub:   currentGroup.PublicKey.PubPoly(),
 		group: currentGroup,

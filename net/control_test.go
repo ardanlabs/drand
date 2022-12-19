@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	testnet "github.com/drand/drand/test/net"
+	"github.com/drand/drand/test/testlogger"
 )
 
 const runtimeGOOSWindows = "windows"
@@ -27,15 +28,16 @@ func TestControlUnix(t *testing.T) {
 		t.Skip("Platform does not support unix.")
 	}
 
+	lg := testlogger.New(t)
 	name := t.TempDir()
 	s := testnet.EmptyServer{}
-	service, err := NewTCPGrpcControlListener(&s, "unix://"+name+"/sock")
+	service, err := NewTCPGrpcControlListener(lg, &s, "unix://"+name+"/sock")
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	client, err := NewControlClient("unix://" + name + "/sock")
+	client, err := NewControlClient(lg, "unix://"+name+"/sock")
 
 	if err != nil {
 		t.Fatal(err)

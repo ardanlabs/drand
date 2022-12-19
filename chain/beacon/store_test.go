@@ -10,7 +10,7 @@ import (
 	"github.com/drand/drand/chain"
 	"github.com/drand/drand/chain/boltdb"
 	"github.com/drand/drand/common/scheme"
-	"github.com/drand/drand/test"
+	"github.com/drand/drand/test/testlogger"
 )
 
 func TestSchemeStore(t *testing.T) {
@@ -19,7 +19,7 @@ func TestSchemeStore(t *testing.T) {
 	dir := t.TempDir()
 	ctx := context.Background()
 
-	l := test.Logger(t)
+	l := testlogger.New(t)
 	bstore, err := boltdb.NewBoltStore(l, dir, nil)
 	require.NoError(t, err)
 

@@ -48,12 +48,12 @@ type Config struct {
 
 // NewConfig returns the config to pass to drand with the default options set
 // and the updated values given by the options.
-func NewConfig(opts ...ConfigOption) *Config {
+func NewConfig(l log.Logger, opts ...ConfigOption) *Config {
 	d := &Config{
 		configFolder: DefaultConfigFolder(),
 		dkgTimeout:   DefaultDKGTimeout,
 		controlPort:  DefaultControlPort,
-		logger:       log.DefaultLogger(),
+		logger:       l,
 		clock:        clock.NewRealClock(),
 	}
 	for i := range opts {
@@ -253,7 +253,7 @@ func WithTrustedCerts(certPaths ...string) ConfigOption {
 			return
 		}
 		if d.certmanager == nil {
-			d.certmanager = net.NewCertManager()
+			d.certmanager = net.NewCertManager(d.logger)
 		}
 		for _, p := range certPaths {
 			if err := d.certmanager.Add(p); err != nil {

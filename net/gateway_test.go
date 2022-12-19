@@ -14,6 +14,7 @@ import (
 
 	"github.com/drand/drand/protobuf/drand"
 	testnet "github.com/drand/drand/test/net"
+	"github.com/drand/drand/test/testlogger"
 )
 
 type testPeer struct {
@@ -54,11 +55,12 @@ func testListener(t *testing.T) {
 	ctx := context.Background()
 	randServer := &testRandomnessServer{round: 42}
 
-	lisGRPC, err := NewGRPCListenerForPrivate(ctx, "localhost:", "", "", randServer, true)
+	lg := testlogger.New(t)
+	lisGRPC, err := NewGRPCListenerForPrivate(ctx, lg, "localhost:", "", "", randServer, true)
 	require.NoError(t, err)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(resp http.ResponseWriter, r *http.Request) { resp.Write([]byte("ok")) })
-	lisREST, err := NewRESTListenerForPublic(ctx, "localhost:", "", "", mux, true)
+	lisREST, err := NewRESTListenerForPublic(ctx, lg, "localhost:", "", "", mux, true)
 	require.NoError(t, err)
 
 	peerGRPC := &testPeer{lisGRPC.Addr(), false}
@@ -70,7 +72,7 @@ func testListener(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// GRPC
-	client := NewGrpcClient()
+	client := NewGrpcClient(lg)
 	resp, err := client.PublicRand(ctx, peerGRPC, &drand.PublicRandRequest{})
 	require.NoError(t, err)
 	expected := &drand.PublicRandResponse{Round: randServer.round}
@@ -97,11 +99,12 @@ func testListenerTLS(t *testing.T) {
 
 	randServer := &testRandomnessServer{round: 42}
 
-	lisGRPC, err := NewGRPCListenerForPrivate(ctx, hostAddr+":", certPath, keyPath, randServer, false)
+	lg := testlogger.New(t)
+	lisGRPC, err := NewGRPCListenerForPrivate(ctx, lg, hostAddr+":", certPath, keyPath, randServer, false)
 	require.NoError(t, err)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(resp http.ResponseWriter, r *http.Request) { resp.Write([]byte("ok")) })
-	lisREST, err := NewRESTListenerForPublic(ctx, hostAddr+":", certPath, keyPath, mux, false)
+	lisREST, err := NewRESTListenerForPublic(ctx, lg, hostAddr+":", certPath, keyPath, mux, false)
 	require.NoError(t, err)
 
 	peerGRPC := &testPeer{lisGRPC.Addr(), true}
@@ -113,11 +116,11 @@ func testListenerTLS(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	certManager := NewCertManager()
+	certManager := NewCertManager(lg)
 	certManager.Add(certPath)
 
 	// test GRPC variant
-	client := NewGrpcClientFromCertManager(certManager)
+	client := NewGrpcClientFromCertManager(lg, certManager)
 	resp, err := client.PublicRand(ctx, peerGRPC, &drand.PublicRandRequest{})
 	require.Nil(t, err)
 	expected := &drand.PublicRandResponse{Round: randServer.round}

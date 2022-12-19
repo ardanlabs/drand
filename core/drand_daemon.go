@@ -120,20 +120,20 @@ func (dd *DrandDaemon) init() error {
 	}
 
 	if pubAddr != "" {
-		if dd.pubGateway, err = net.NewRESTPublicGateway(ctx, pubAddr, c.certPath, c.keyPath, c.certmanager,
+		if dd.pubGateway, err = net.NewRESTPublicGateway(ctx, dd.log, pubAddr, c.certPath, c.keyPath, c.certmanager,
 			handler.GetHTTPHandler(), c.insecure); err != nil {
 			return err
 		}
 	}
 
 	dd.handler = handler
-	dd.privGateway, err = net.NewGRPCPrivateGateway(ctx, privAddr, c.certPath, c.keyPath, c.certmanager, dd, c.insecure, c.grpcOpts...)
+	dd.privGateway, err = net.NewGRPCPrivateGateway(ctx, dd.log, privAddr, c.certPath, c.keyPath, c.certmanager, dd, c.insecure, c.grpcOpts...)
 	if err != nil {
 		return err
 	}
 
 	p := c.ControlPort()
-	dd.control, err = net.NewTCPGrpcControlListener(dd, p)
+	dd.control, err = net.NewTCPGrpcControlListener(dd.log, dd, p)
 
 	if err != nil {
 		return err
@@ -186,7 +186,7 @@ func (dd *DrandDaemon) RemoveBeaconProcess(beaconID string, bp *BeaconProcess) {
 
 	chainHash := ""
 	if bp.group != nil {
-		info := chain.NewChainInfo(bp.group)
+		info := chain.NewChainInfo(dd.log, bp.group)
 		chainHash = info.HashString()
 	}
 
@@ -211,7 +211,7 @@ func (dd *DrandDaemon) RemoveBeaconProcess(beaconID string, bp *BeaconProcess) {
 // AddBeaconHandler adds a handler linked to beacon with chain hash from http server used to
 // expose public services
 func (dd *DrandDaemon) AddBeaconHandler(beaconID string, bp *BeaconProcess) {
-	chainHash := chain.NewChainInfo(bp.group).HashString()
+	chainHash := chain.NewChainInfo(dd.log, bp.group).HashString()
 
 	bh := dd.handler.RegisterNewBeaconHandler(&drandProxy{bp}, chainHash)
 
@@ -232,7 +232,7 @@ func (dd *DrandDaemon) AddBeaconHandler(beaconID string, bp *BeaconProcess) {
 // expose public services
 func (dd *DrandDaemon) RemoveBeaconHandler(beaconID string, bp *BeaconProcess) {
 	if bp.group != nil {
-		info := chain.NewChainInfo(bp.group)
+		info := chain.NewChainInfo(dd.log, bp.group)
 		dd.handler.RemoveBeaconHandler(info.HashString())
 		if common.IsDefaultBeaconID(beaconID) {
 			dd.handler.RemoveBeaconHandler(common.DefaultChainHash)
@@ -285,7 +285,7 @@ func (dd *DrandDaemon) LoadBeaconsFromDisk(metricsFlag string, singleBeacon bool
 
 	// Start metrics server
 	if len(metricsHandlers) > 0 {
-		_ = metrics.Start(metricsFlag, pprof.WithProfile(), metricsHandlers)
+		_ = metrics.Start(dd.log, metricsFlag, pprof.WithProfile(), metricsHandlers)
 	}
 
 	return nil

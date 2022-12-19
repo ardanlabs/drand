@@ -122,7 +122,7 @@ func (bp *BeaconProcess) Load() (bool, error) {
 	}
 
 	bp.state.Lock()
-	info := chain.NewChainInfo(bp.group)
+	info := chain.NewChainInfo(bp.log, bp.group)
 	bp.chainHash = info.Hash()
 	checkGroup(bp.log, bp.group)
 	bp.state.Unlock()
@@ -203,7 +203,7 @@ func (bp *BeaconProcess) WaitDKG() (*key.Group, error) {
 	// setup the dist. public key
 	targetGroup.PublicKey = bp.share.Public()
 	bp.group = targetGroup
-	info := chain.NewChainInfo(targetGroup)
+	info := chain.NewChainInfo(bp.log, targetGroup)
 	bp.chainHash = info.Hash()
 	output := make([]string, 0, len(qualNodes))
 	for _, node := range qualNodes {

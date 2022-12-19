@@ -17,12 +17,12 @@ import (
 	"github.com/drand/drand/common"
 	"github.com/drand/drand/common/scheme"
 	"github.com/drand/drand/key"
-	"github.com/drand/drand/log"
 	"github.com/drand/drand/net"
 	pbCommon "github.com/drand/drand/protobuf/common"
 	"github.com/drand/drand/protobuf/drand"
 	"github.com/drand/drand/test"
 	testnet "github.com/drand/drand/test/net"
+	"github.com/drand/drand/test/testlogger"
 	"github.com/drand/kyber"
 	"github.com/drand/kyber/share"
 	"github.com/drand/kyber/util/random"
@@ -191,7 +191,7 @@ func (b *BeaconTest) CreateNode(t *testing.T, i int) {
 	keyShare := findShare(idx)
 	node.shares = keyShare
 
-	l := test.Logger(t)
+	l := testlogger.New(t)
 	store, err := createStore(t, l, b, idx)
 	require.NoError(t, err)
 	node.clock = clock.NewFakeClockAt(b.time.Now())
@@ -202,9 +202,12 @@ func (b *BeaconTest) CreateNode(t *testing.T, i int) {
 		Clock:  node.clock,
 	}
 
-	logger := log.NewLogger(nil, log.LogDebug).Named("BeaconTest").Named(knode.Addr).Named(fmt.Sprint(idx))
+	logger := testlogger.New(t).
+		Named("BeaconTest").
+		Named(knode.Addr).
+		Named(fmt.Sprintf("%d", idx))
 	version := common.GetAppVersion()
-	node.handler, err = NewHandler(net.NewGrpcClient(), store, conf, logger, version)
+	node.handler, err = NewHandler(net.NewGrpcClient(l), store, conf, logger, version)
 	checkErr(err)
 	if node.callback != nil {
 		node.handler.AddCallback(priv.Public.Address(), node.callback)
@@ -248,6 +251,7 @@ func (b *BeaconTest) ServeBeacon(t *testing.T, i int) {
 	var err error
 	b.nodes[j].listener, err = net.NewGRPCListenerForPrivate(
 		context.Background(),
+		testlogger.New(t),
 		b.nodes[j].private.Public.Address(),
 		"", "",
 		beaconServer,
@@ -612,7 +616,7 @@ func TestProcessingPartialBeaconWithNonExistentIndexDoesntSegfault(t *testing.T)
 }
 
 func TestSyncChainWithoutMetadata(t *testing.T) {
-	logger := log.NewLogger(nil, log.LogDebug).Named("BeaconTest")
+	logger := testlogger.New(t)
 	expectedBeaconID := "someGreatBeacon"
 
 	require.Equal(

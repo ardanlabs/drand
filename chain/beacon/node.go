@@ -71,7 +71,7 @@ func NewHandler(c net.ProtocolClient, s chain.Store, conf *Config, l log.Logger,
 		return nil, errors.New("beacon: keypair not included in the given group")
 	}
 	addr := conf.Public.Address()
-	crypto := newCryptoStore(conf.Group, conf.Share)
+	crypto := newCryptoStore(l, conf.Group, conf.Share)
 	// insert genesis beacon
 	if err := s.Put(context.Background(), chain.GenesisBeacon(crypto.chain)); err != nil {
 		return nil, err

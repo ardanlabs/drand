@@ -119,7 +119,7 @@ func (l *LocalNode) Start(certFolder string, dbEngineType chain.StorageType, pgD
 		opts = append(opts, core.WithInsecure())
 	}
 
-	conf := core.NewConfig(opts...)
+	conf := core.NewConfig(l.log, opts...)
 	ks := key.NewFileStore(conf.ConfigFolderMB(), l.beaconID)
 	err = ks.SaveKeyPair(l.priv)
 	if err != nil {
@@ -198,7 +198,7 @@ func (l *LocalNode) ctrl() *net.ControlClient {
 	if l.ctrlClient != nil {
 		return l.ctrlClient
 	}
-	cl, err := net.NewControlClient(l.ctrlAddr)
+	cl, err := net.NewControlClient(l.log, l.ctrlAddr)
 	if err != nil {
 		l.log.Errorw("", "drand", "can't instantiate control client", "err", err)
 		return nil
@@ -290,7 +290,7 @@ func (l *LocalNode) GetBeacon(groupPath string, round uint64) (resp *drand.Publi
 	if l.tls {
 		cert = path.Join(l.base, fmt.Sprintf("server-%d.crt", l.i))
 	}
-	c, _ := grpc.New(l.privAddr, cert, cert == "", []byte(""))
+	c, _ := grpc.New(l.log, l.privAddr, cert, cert == "", []byte(""))
 
 	group := l.GetGroup()
 	if group == nil {

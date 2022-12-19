@@ -8,8 +8,8 @@ import (
 	"github.com/drand/drand/chain"
 	"github.com/drand/drand/common/scheme"
 	"github.com/drand/drand/key"
-	"github.com/drand/drand/log"
 	"github.com/drand/drand/protobuf/drand"
+	"github.com/drand/drand/test/testlogger"
 	"github.com/drand/kyber/share"
 )
 
@@ -60,7 +60,7 @@ func TestCacheRound(t *testing.T) {
 }
 
 func TestCachePartial(t *testing.T) {
-	l := log.DefaultLogger()
+	l := testlogger.New(t)
 	cache := newPartialCache(l)
 	var round uint64 = 64
 	prev := []byte("yesterday was another day")

@@ -61,11 +61,11 @@ func (*nilCache) TryGet(_ uint64) Result {
 
 // NewCachingClient is a meta client that stores an LRU cache of
 // recently fetched random values.
-func NewCachingClient(client Client, cache Cache) (Client, error) {
+func NewCachingClient(l log.Logger, client Client, cache Cache) (Client, error) {
 	return &cachingClient{
 		Client: client,
 		cache:  cache,
-		log:    log.DefaultLogger(),
+		log:    l,
 	}, nil
 }
 

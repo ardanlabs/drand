@@ -17,17 +17,19 @@ import (
 	"github.com/drand/drand/common/scheme"
 	"github.com/drand/drand/protobuf/drand"
 	"github.com/drand/drand/test/mock"
+	"github.com/drand/drand/test/testlogger"
 )
 
 func withClient(t *testing.T) (c client.Client, emit func(bool)) {
 	t.Helper()
 	sch := scheme.GetSchemeFromEnv()
 
-	l, s := mock.NewMockGRPCPublicServer(t, ":0", true, sch)
+	lg := testlogger.New(t)
+	l, s := mock.NewMockGRPCPublicServer(t, lg, ":0", true, sch)
 	lAddr := l.Addr()
 	go l.Start()
 
-	c, _ = grpc.New(lAddr, "", true, []byte(""))
+	c, _ = grpc.New(lg, lAddr, "", true, []byte(""))
 
 	return c, s.(mock.MockService).EmitRand
 }
@@ -48,7 +50,8 @@ func TestHTTPRelay(t *testing.T) {
 
 	c, _ := withClient(t)
 
-	handler, err := New(ctx, "", nil)
+	lg := testlogger.New(t)
+	handler, err := New(ctx, "", lg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +154,8 @@ func TestHTTPWaiting(t *testing.T) {
 	defer cancel()
 	c, push := withClient(t)
 
-	handler, err := New(ctx, "", nil)
+	lg := testlogger.New(t)
+	handler, err := New(ctx, "", lg)
 	require.NoError(t, err)
 
 	info, err := c.Info(ctx)
@@ -216,7 +220,8 @@ func TestHTTPWatchFuture(t *testing.T) {
 	defer cancel()
 	c, _ := withClient(t)
 
-	handler, err := New(ctx, "", nil)
+	lg := testlogger.New(t)
+	handler, err := New(ctx, "", lg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +257,8 @@ func TestHTTPHealth(t *testing.T) {
 	defer cancel()
 	c, push := withClient(t)
 
-	handler, err := New(ctx, "", nil)
+	lg := testlogger.New(t)
+	handler, err := New(ctx, "", lg)
 	if err != nil {
 		t.Fatal(err)
 	}
