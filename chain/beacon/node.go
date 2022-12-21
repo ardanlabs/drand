@@ -49,7 +49,9 @@ type Handler struct {
 	ticker   *ticker
 	verifier *chain.Verifier
 
-	close   chan bool
+	ctx        context.Context
+	cancelFunc context.CancelFunc
+
 	addr    string
 	started bool
 	running bool
@@ -77,21 +79,24 @@ func NewHandler(c net.ProtocolClient, s chain.Store, conf *Config, l log.Logger,
 		return nil, err
 	}
 
-	ticker := newTicker(conf.Clock, conf.Group.Period, conf.Group.GenesisTime)
-	store := newChainStore(l, conf, c, crypto, s, ticker)
+	ctx, cancelFunc := context.WithCancel(context.Background())
+
+	ticker := newTicker(ctx, conf.Clock, conf.Group.Period, conf.Group.GenesisTime)
+	store := newChainStore(ctx, l, conf, c, crypto, s, ticker)
 	verifier := chain.NewVerifier(conf.Group.Scheme)
 
 	handler := &Handler{
-		conf:     conf,
-		client:   c,
-		crypto:   crypto,
-		chain:    store,
-		verifier: verifier,
-		ticker:   ticker,
-		addr:     addr,
-		close:    make(chan bool),
-		l:        l,
-		version:  version,
+		conf:       conf,
+		client:     c,
+		crypto:     crypto,
+		chain:      store,
+		verifier:   verifier,
+		ticker:     ticker,
+		addr:       addr,
+		ctx:        ctx,
+		cancelFunc: cancelFunc,
+		l:          l,
+		version:    version,
 	}
 	return handler, nil
 }
@@ -361,7 +366,7 @@ func (h *Handler) run(startTime int64) {
 					h.broadcastNextPartial(c, latest)
 				}(current, b)
 			}
-		case <-h.close:
+		case <-h.ctx.Done():
 			h.l.Debugw("", "beacon_loop", "finished")
 			return
 		}
@@ -429,10 +434,9 @@ func (h *Handler) Stop() {
 	if h.stopped {
 		return
 	}
-	close(h.close)
 
+	h.cancelFunc()
 	h.chain.Stop()
-	h.ticker.Stop()
 
 	h.stopped = true
 	h.running = false

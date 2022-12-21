@@ -146,7 +146,8 @@ func (d *discrepancyStore) Put(ctx context.Context, b *chain.Beacon) error {
 type callbackStore struct {
 	chain.Store
 	sync.Mutex
-	done      chan bool
+
+	ctx       context.Context
 	callbacks map[string]func(*chain.Beacon)
 	newJob    chan cbPair
 }
@@ -159,12 +160,12 @@ type cbPair struct {
 // NewCallbackStore returns a Store that uses a pool of worker to dispatch the
 // beacon to the registered callbacks. The callbacks are not called if the "Put"
 // operations failed.
-func NewCallbackStore(s chain.Store) CallbackStore {
+func NewCallbackStore(ctx context.Context, s chain.Store) CallbackStore {
 	cbs := &callbackStore{
+		ctx:       ctx,
 		Store:     s,
 		callbacks: make(map[string]func(*chain.Beacon)),
 		newJob:    make(chan cbPair, CallbackWorkerQueue),
-		done:      make(chan bool, 1),
 	}
 	cbs.runWorkers(runtime.NumCPU())
 	return cbs
@@ -172,13 +173,29 @@ func NewCallbackStore(s chain.Store) CallbackStore {
 
 // Put stores a new beacon
 func (c *callbackStore) Put(ctx context.Context, b *chain.Beacon) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-c.ctx.Done():
+		return c.ctx.Err()
+	default:
+	}
 	if err := c.Store.Put(ctx, b); err != nil {
 		return err
 	}
+
 	if b.Round != 0 {
 		c.Lock()
 		defer c.Unlock()
 		for _, cb := range c.callbacks {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-c.ctx.Done():
+				return c.ctx.Err()
+			default:
+			}
+
 			c.newJob <- cbPair{
 				cb: cb,
 				b:  b,
@@ -202,7 +219,6 @@ func (c *callbackStore) RemoveCallback(id string) {
 }
 
 func (c *callbackStore) Close(ctx context.Context) error {
-	defer close(c.done)
 	return c.Store.Close(ctx)
 }
 
@@ -217,7 +233,7 @@ func (c *callbackStore) runWorker() {
 		select {
 		case newJob := <-c.newJob:
 			newJob.cb(newJob.b)
-		case <-c.done:
+		case <-c.ctx.Done():
 			return
 		}
 	}

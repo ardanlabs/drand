@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	cl "github.com/jonboulle/clockwork"
@@ -42,8 +41,6 @@ type SyncManager struct {
 	newReq chan requestInfo
 	// updated with each new beacon we receive from sync
 	newSync chan *chain.Beacon
-	done    chan bool
-	mu      sync.Mutex
 	// we need to know our current daemon address
 	nodeAddr string
 }
@@ -83,14 +80,7 @@ func NewSyncManager(c *SyncConfig) *SyncManager {
 		factor:        syncExpiryFactor,
 		newReq:        make(chan requestInfo, syncQueueRequest),
 		newSync:       make(chan *chain.Beacon, 1),
-		done:          make(chan bool, 1),
 	}
-}
-
-func (s *SyncManager) Stop() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	close(s.done)
 }
 
 type requestInfo struct {
@@ -111,7 +101,7 @@ func (s *SyncManager) RequestSync(upTo uint64, nodes []net.Peer) {
 }
 
 // Run handles non-blocking sync requests coming from the regular operation of the daemon
-func (s *SyncManager) Run() {
+func (s *SyncManager) Run(ctx context.Context) {
 	// no need to sync until genesis time
 	for s.clock.Now().Unix() < s.info.GenesisTime {
 		time.Sleep(time.Second)
@@ -119,12 +109,12 @@ func (s *SyncManager) Run() {
 	// tracks the time of the last round we successfully synced
 	lastRoundTime := 0
 	// the context being used by the current sync process
-	ctx, cancel := context.WithCancel(context.Background())
+	localCtx, cancel := context.WithCancel(ctx)
 	for {
 		select {
 		case request := <-s.newReq:
 			// check if the request is still valid
-			last, err := s.store.Last(ctx)
+			last, err := s.store.Last(localCtx)
 			if err != nil {
 				s.log.Debugw("unable to fetch from store", "sync_manager", "store.Last", "err", err)
 				continue
@@ -145,15 +135,15 @@ func (s *SyncManager) Run() {
 				// we haven't received a new block in a while
 				// -> time to start a new sync
 				cancel()
-				ctx, cancel = context.WithCancel(context.Background())
+				localCtx, cancel = context.WithCancel(ctx)
 				//nolint
-				go s.Sync(ctx, request)
+				go s.Sync(localCtx, request)
 			}
 
 		case <-s.newSync:
 			// just received a new beacon from sync, we keep track of this time
 			lastRoundTime = int(s.clock.Now().Unix())
-		case <-s.done:
+		case <-ctx.Done():
 			s.log.Infow("", "sync_manager", "exits")
 			cancel()
 			return

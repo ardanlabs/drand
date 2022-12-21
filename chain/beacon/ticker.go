@@ -1,6 +1,7 @@
 package beacon
 
 import (
+	"context"
 	"time"
 
 	clock "github.com/jonboulle/clockwork"
@@ -11,20 +12,20 @@ import (
 const tickerChanBacklog = 5
 
 type ticker struct {
+	ctx     context.Context
 	clock   clock.Clock
 	period  time.Duration
 	genesis int64
 	newCh   chan channelInfo
-	stop    chan bool
 }
 
-func newTicker(c clock.Clock, period time.Duration, genesis int64) *ticker {
+func newTicker(ctx context.Context, c clock.Clock, period time.Duration, genesis int64) *ticker {
 	t := &ticker{
+		ctx:     ctx,
 		clock:   c,
 		period:  period,
 		genesis: genesis,
 		newCh:   make(chan channelInfo, tickerChanBacklog),
-		stop:    make(chan bool, 1),
 	}
 	go t.Start()
 	return t
@@ -47,9 +48,6 @@ func (t *ticker) ChannelAt(start int64) chan roundInfo {
 	}
 	return newCh
 }
-func (t *ticker) Stop() {
-	close(t.stop)
-}
 
 func (t *ticker) CurrentRound() uint64 {
 	return chain.CurrentRound(t.clock.Now().Unix(), t.period, t.genesis)
@@ -62,6 +60,11 @@ func (t *ticker) Start() {
 	// whole reason of this function is to accept new incoming channels while
 	// still sleeping until the next time
 	go func() {
+		select {
+		case <-t.ctx.Done():
+			return
+		default:
+		}
 		now := t.clock.Now().Unix()
 		_, ttime := chain.NextRound(now, t.period, t.genesis)
 		if ttime > now {
@@ -76,12 +79,18 @@ func (t *ticker) Start() {
 			select {
 			case nt := <-tickChan:
 				chanTime <- nt
-			case <-t.stop:
+			case <-t.ctx.Done():
 				return
 			}
 		}
 	}()
 	var channels []channelInfo
+	defer func() {
+		for _, ch := range channels {
+			close(ch.ch)
+		}
+	}()
+
 	var sendTicks = false
 	var ttime int64
 	var tround uint64
@@ -97,6 +106,8 @@ func (t *ticker) Start() {
 					continue
 				}
 				select {
+				case <-t.ctx.Done():
+					return
 				case chinfo.ch <- info:
 				default:
 					// pass on, do not send if channel is full
@@ -110,10 +121,7 @@ func (t *ticker) Start() {
 			sendTicks = true
 		case newChan := <-t.newCh:
 			channels = append(channels, newChan)
-		case <-t.stop:
-			for _, ch := range channels {
-				close(ch.ch)
-			}
+		case <-t.ctx.Done():
 			return
 		}
 	}

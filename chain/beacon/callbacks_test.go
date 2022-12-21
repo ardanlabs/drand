@@ -18,21 +18,23 @@ func TestStoreCallback(t *testing.T) {
 	l := testlogger.New(t)
 	bbstore, err := boltdb.NewBoltStore(l, dir, nil)
 	require.NoError(t, err)
-	cb := NewCallbackStore(bbstore)
+	cb := NewCallbackStore(ctx, bbstore)
 	id1 := "superid"
 	doneCh := make(chan bool, 1)
 	cb.AddCallback(id1, func(b *chain.Beacon) {
 		doneCh <- true
 	})
 
-	cb.Put(ctx, &chain.Beacon{
+	err = cb.Put(ctx, &chain.Beacon{
 		Round: 1,
 	})
+	require.NoError(t, err)
 	require.True(t, checkOne(doneCh))
 	cb.AddCallback(id1, func(*chain.Beacon) {})
-	cb.Put(ctx, &chain.Beacon{
+	err = cb.Put(ctx, &chain.Beacon{
 		Round: 1,
 	})
+	require.NoError(t, err)
 	require.False(t, checkOne(doneCh))
 
 	cb.RemoveCallback(id1)

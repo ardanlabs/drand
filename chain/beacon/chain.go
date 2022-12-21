@@ -2,6 +2,7 @@ package beacon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/drand/drand/chain"
@@ -21,14 +22,14 @@ const (
 // be inserted in the database and for replying to beacon requests.
 type chainStore struct {
 	CallbackStore
-	l           log.Logger
-	conf        *Config
-	client      net.ProtocolClient
-	syncm       *SyncManager
-	verifier    *chain.Verifier
-	crypto      *cryptoStore
-	ticker      *ticker
-	done        chan bool
+	ctx      context.Context
+	l        log.Logger
+	conf     *Config
+	client   net.ProtocolClient
+	syncm    *SyncManager
+	verifier *chain.Verifier
+	crypto   *cryptoStore
+	ticker   *ticker
 	newPartials chan partialInfo
 	// catchupBeacons is used to notify the Handler when a node has aggregated a
 	// beacon.
@@ -38,7 +39,7 @@ type chainStore struct {
 	beaconStoredAgg chan *chain.Beacon
 }
 
-func newChainStore(l log.Logger, cf *Config, cl net.ProtocolClient, c *cryptoStore, store chain.Store, t *ticker) *chainStore {
+func newChainStore(ctx context.Context, l log.Logger, cf *Config, cl net.ProtocolClient, c *cryptoStore, store chain.Store, t *ticker) *chainStore {
 	// we make sure the chain is increasing monotonically
 	as := newAppendStore(store)
 
@@ -49,7 +50,7 @@ func newChainStore(l log.Logger, cf *Config, cl net.ProtocolClient, c *cryptoSto
 	ds := newDiscrepancyStore(ss, l, c.GetGroup(), cf.Clock)
 
 	// we can register callbacks on it
-	cbs := NewCallbackStore(ds)
+	cbs := NewCallbackStore(ctx, ds)
 
 	// we give the final append store to the sync manager
 	syncm := NewSyncManager(&SyncConfig{
@@ -61,20 +62,20 @@ func newChainStore(l log.Logger, cf *Config, cl net.ProtocolClient, c *cryptoSto
 		Clock:       cf.Clock,
 		NodeAddr:    cf.Public.Address(),
 	})
-	go syncm.Run()
+	go syncm.Run(ctx)
 
 	verifier := chain.NewVerifier(cf.Group.Scheme)
 
 	cs := &chainStore{
-		CallbackStore:   cbs,
-		l:               l,
-		conf:            cf,
-		client:          cl,
-		syncm:           syncm,
-		verifier:        verifier,
-		crypto:          c,
-		ticker:          t,
-		done:            make(chan bool, 1),
+		CallbackStore: cbs,
+		ctx:           ctx,
+		l:             l,
+		conf:          cf,
+		client:        cl,
+		syncm:         syncm,
+		verifier:      verifier,
+		crypto:        c,
+		ticker:        t,
 		newPartials:     make(chan partialInfo, defaultPartialChanBuffer),
 		catchupBeacons:  make(chan *chain.Beacon, 1),
 		beaconStoredAgg: make(chan *chain.Beacon, defaultNewBeaconBuffer),
@@ -97,9 +98,7 @@ func (c *chainStore) NewValidPartial(addr string, p *drand.PartialBeaconPacket) 
 }
 
 func (c *chainStore) Stop() {
-	c.syncm.Stop()
-	c.CallbackStore.Close(context.Background())
-	close(c.done)
+	c.CallbackStore.Close(c.ctx)
 }
 
 // we store partials that are up to this amount of rounds more than the last
@@ -110,15 +109,37 @@ var partialCacheStoreLimit = 3
 // runAggregator runs a continuous loop that tries to aggregate partial
 // signatures when it can
 func (c *chainStore) runAggregator() {
-	lastBeacon, err := c.Last(context.Background())
+	lastBeacon, err := c.Last(c.ctx)
+	// TODO: This does not solve the actual issue here.
+	//  For some reason, the test we are interested in, TestRunDKGReshareAbsentNode,
+	//  still reproduces the error we need to fix.
+	//  Further investigation is required to determine what holds `runAggregator` from running
+	//  or why is it running multiple times (if it is).
+	//  E.g. of the failure:
+	//    2022-12-22T01:27:45.422+0200    DEBUG   127.0.0.1:39779.default.1       beacon/node.go:234              {"new_node": "following chain", "to_round": 3}
+	//    2022-12-22T01:27:45.422+0200    INFO    127.0.0.1:39779.default.1       core/drand_beacon.go:284                {"transition_new": "done"}
+	//    2022-12-22T01:27:45.422+0200    DEBUG   127.0.0.1:39779.default.1       beacon/node.go:306              {"run_round": "wait", "until": 449884814}
+	//    2022-12-22T01:27:45.422+0200    INFO    127.0.0.1:39779.default.1       beacon/node.go:443      beacon handler stopped  {"time": "1984-04-04T00:00:12.000Z"}
+	//    2022-12-22T01:27:45.422+0200    DEBUG   127.0.0.1:39779.default.1       beacon/node.go:370              {"beacon_loop": "finished"}
+	//    2022-12-22T01:27:45.422+0200    DEBUG   127.0.0.1:39779.default.1.SyncManager   beacon/sync_manager.go:119      unable to fetch from store      {"sync_manager": "store.Last", "err": "database not open"}
+	//    2022-12-22T01:27:45.422+0200    WARN    127.0.0.1:39779.default.1       beacon/chain.go:118             {"chain_aggregator": "loading aborted"}
+	//    2022-12-22T01:27:45.422+0200    INFO    127.0.0.1:39779.default.1.SyncManager   beacon/sync_manager.go:147              {"sync_manager": "exits"}
 	if err != nil {
-		c.l.Fatalw("", "chain_aggregator", "loading", "last_beacon", err)
+		ctxErr := c.ctx.Err()
+
+		if ctxErr != nil ||
+			errors.Is(err, context.Canceled) {
+			c.l.Warnw("", "chain_aggregator", "loading aborted")
+			return
+		}
+
+		c.l.Fatalw("", "chain_aggregator", "loading", "last_beacon", ctxErr)
 	}
 
 	var cache = newPartialCache(c.l)
 	for {
 		select {
-		case <-c.done:
+		case <-c.ctx.Done():
 			return
 		case lastBeacon = <-c.beaconStoredAgg:
 			cache.FlushRounds(lastBeacon.Round)

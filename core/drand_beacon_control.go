@@ -1133,6 +1133,7 @@ func (bp *BeaconProcess) StartFollowChain(req *drand.StartSyncRequest, stream dr
 	// continue nevertheless we can use the next line by using a new context.
 	// ctx, cancel := context.WithCancel(context.Background())
 	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
 	bp.syncerCancel = cancel
 
 	bp.state.Unlock()
@@ -1193,7 +1194,7 @@ func (bp *BeaconProcess) StartFollowChain(req *drand.StartSyncRequest, stream dr
 	ss := beacon.NewSchemeStore(store, info.Scheme)
 
 	// register callback to notify client of progress
-	cbStore := beacon.NewCallbackStore(ss)
+	cbStore := beacon.NewCallbackStore(ctx, ss)
 	defer cbStore.Close(ctx)
 
 	cb, done := sendProgressCallback(stream, req.GetUpTo(), info, bp.opts.clock, bp.log)
@@ -1211,8 +1212,7 @@ func (bp *BeaconProcess) StartFollowChain(req *drand.StartSyncRequest, stream dr
 		Clock:       bp.opts.clock,
 		NodeAddr:    bp.priv.Public.Address(),
 	})
-	go syncer.Run()
-	defer syncer.Stop()
+	go syncer.Run(ctx)
 
 	for {
 		syncer.RequestSync(req.GetUpTo(), peers)
