@@ -114,6 +114,12 @@ func newDiscrepancyStore(s chain.Store, l log.Logger, group *key.Group, cl clock
 }
 
 func (d *discrepancyStore) Put(ctx context.Context, b *chain.Beacon) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	// When computing time_discrepancy, time.Now() should be obtained as close as
 	// possible to receiving the beacon, before any other storage layer interaction.
 	// When moved after store.Put(), the value will include the time it takes
@@ -122,6 +128,12 @@ func (d *discrepancyStore) Put(ctx context.Context, b *chain.Beacon) error {
 
 	if err := d.Store.Put(ctx, b); err != nil {
 		return err
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
 	}
 
 	storageTime := d.clock.Now()
@@ -172,6 +184,12 @@ func NewCallbackStore(s chain.Store) CallbackStore {
 
 // Put stores a new beacon
 func (c *callbackStore) Put(ctx context.Context, b *chain.Beacon) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	if err := c.Store.Put(ctx, b); err != nil {
 		return err
 	}

@@ -74,6 +74,7 @@ func NewBoltStore(ctx context.Context, l log.Logger, folder string, opts *bolt.O
 }
 
 func shouldUseTrimmedBolt(ctx context.Context, sourceBeaconPath string, opts *bolt.Options) bool {
+	return true
 	if isThisATest(ctx) {
 		return false
 	}
@@ -127,7 +128,13 @@ func (b *BoltStore) Close(context.Context) error {
 
 // Put implements the Store interface. WARNING: It does NOT verify that this
 // beacon is not already saved in the database or not and will overwrite it.
-func (b *BoltStore) Put(_ context.Context, beacon *chain.Beacon) error {
+func (b *BoltStore) Put(ctx context.Context, beacon *chain.Beacon) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	return b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(beaconBucket)
 		key := chain.RoundToBytes(beacon.Round)
@@ -135,6 +142,13 @@ func (b *BoltStore) Put(_ context.Context, beacon *chain.Beacon) error {
 		if err != nil {
 			return err
 		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		err = bucket.Put(key, buff)
 		if err != nil {
 			b.log.Debugw("storing beacon", "round", beacon.Round, "err", err)
@@ -144,9 +158,21 @@ func (b *BoltStore) Put(_ context.Context, beacon *chain.Beacon) error {
 }
 
 // Last returns the last beacon signature saved into the db
-func (b *BoltStore) Last(context.Context) (*chain.Beacon, error) {
+func (b *BoltStore) Last(ctx context.Context) (*chain.Beacon, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	beacon := &chain.Beacon{}
 	err := b.db.View(func(tx *bolt.Tx) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		bucket := tx.Bucket(beaconBucket)
 		cursor := bucket.Cursor()
 		_, v := cursor.Last()

@@ -49,7 +49,8 @@ type Handler struct {
 	ticker   *ticker
 	verifier *chain.Verifier
 
-	close   chan bool
+	ctx     context.Context
+	close   context.CancelFunc
 	addr    string
 	started bool
 	running bool
@@ -77,8 +78,10 @@ func NewHandler(c net.ProtocolClient, s chain.Store, conf *Config, l log.Logger,
 		return nil, err
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	ticker := newTicker(conf.Clock, conf.Group.Period, conf.Group.GenesisTime)
-	store := newChainStore(l, conf, c, crypto, s, ticker)
+	store := newChainStore(ctx, l, conf, c, crypto, s, ticker)
 	verifier := chain.NewVerifier(conf.Group.Scheme)
 
 	handler := &Handler{
@@ -89,7 +92,8 @@ func NewHandler(c net.ProtocolClient, s chain.Store, conf *Config, l log.Logger,
 		verifier: verifier,
 		ticker:   ticker,
 		addr:     addr,
-		close:    make(chan bool),
+		ctx:      ctx,
+		close:    cancel,
 		l:        l,
 		version:  version,
 	}
@@ -101,6 +105,12 @@ var errOutOfRound = "out-of-round beacon request"
 // ProcessPartialBeacon receives a request for a beacon partial signature. It
 // forwards it to the round manager if it is a valid beacon.
 func (h *Handler) ProcessPartialBeacon(c context.Context, p *proto.PartialBeaconPacket) (*proto.Empty, error) {
+	select {
+	case <-c.Done():
+		return nil, c.Err()
+	default:
+	}
+
 	addr := net.RemoteAddress(c)
 	h.l.Debugw("", "received", "request", "from", addr, "round", p.GetRound())
 
@@ -157,6 +167,13 @@ func (h *Handler) ProcessPartialBeacon(c context.Context, p *proto.PartialBeacon
 		// XXX error or not ?
 		return new(proto.Empty), nil
 	}
+
+	select {
+	case <-c.Done():
+		return nil, c.Err()
+	default:
+	}
+
 	h.chain.NewValidPartial(addr, p)
 	return new(proto.Empty), nil
 }
@@ -361,7 +378,7 @@ func (h *Handler) run(startTime int64) {
 					h.broadcastNextPartial(c, latest)
 				}(current, b)
 			}
-		case <-h.close:
+		case <-h.ctx.Done():
 			h.l.Debugw("", "beacon_loop", "finished")
 			return
 		}
@@ -369,7 +386,6 @@ func (h *Handler) run(startTime int64) {
 }
 
 func (h *Handler) broadcastNextPartial(current roundInfo, upon *chain.Beacon) {
-	ctx := context.Background()
 	previousSig := upon.Signature
 	round := upon.Round + 1
 	beaconID := commonutils.GetCanonicalBeaconID(h.conf.Group.ID)
@@ -408,8 +424,14 @@ func (h *Handler) broadcastNextPartial(current roundInfo, upon *chain.Beacon) {
 			continue
 		}
 		go func(i *key.Identity) {
+			select{
+			case <-h.ctx.Done():
+				return
+			default:
+			}
+
 			h.l.Debugw("", "beacon_round", round, "send_to", i.Address())
-			err := h.client.PartialBeacon(ctx, i, packet)
+			err := h.client.PartialBeacon(h.ctx, i, packet)
 			if err != nil {
 				h.l.Errorw("", "beacon_round", round, "err_request", err, "from", i.Address())
 				if strings.Contains(err.Error(), errOutOfRound) {
@@ -429,7 +451,7 @@ func (h *Handler) Stop() {
 	if h.stopped {
 		return
 	}
-	close(h.close)
+	h.close()
 
 	h.ticker.Stop()
 	h.chain.Stop()

@@ -125,6 +125,12 @@ func (p *Store) Len(ctx context.Context) (int, error) {
 
 // Put adds the specified beacon to the database.
 func (p *Store) Put(ctx context.Context, b *chain.Beacon) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	const query = `
 	INSERT INTO beacon_details
 		(beacon_id, round, signature)

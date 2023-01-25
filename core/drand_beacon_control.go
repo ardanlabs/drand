@@ -1211,7 +1211,7 @@ func (bp *BeaconProcess) StartFollowChain(req *drand.StartSyncRequest, stream dr
 		Clock:       bp.opts.clock,
 		NodeAddr:    bp.priv.Public.Address(),
 	})
-	go syncer.Run()
+	go syncer.Run(ctx)
 	defer syncer.Stop()
 
 	for {

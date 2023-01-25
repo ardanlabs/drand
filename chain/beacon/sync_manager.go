@@ -111,15 +111,22 @@ func (s *SyncManager) RequestSync(upTo uint64, nodes []net.Peer) {
 }
 
 // Run handles non-blocking sync requests coming from the regular operation of the daemon
-func (s *SyncManager) Run() {
+func (s *SyncManager) Run(mainCtx context.Context) {
 	// no need to sync until genesis time
 	for s.clock.Now().Unix() < s.info.GenesisTime {
 		time.Sleep(time.Second)
 	}
+
+	select {
+	case <-mainCtx.Done():
+		return
+	default:
+	}
+
 	// tracks the time of the last round we successfully synced
 	lastRoundTime := 0
 	// the context being used by the current sync process
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(mainCtx)
 	for {
 		select {
 		case request := <-s.newReq:
@@ -145,7 +152,7 @@ func (s *SyncManager) Run() {
 				// we haven't received a new block in a while
 				// -> time to start a new sync
 				cancel()
-				ctx, cancel = context.WithCancel(context.Background())
+				ctx, cancel = context.WithCancel(mainCtx)
 				//nolint
 				go s.Sync(ctx, request)
 			}
@@ -156,6 +163,10 @@ func (s *SyncManager) Run() {
 		case <-s.done:
 			s.log.Infow("", "sync_manager", "exits")
 			cancel()
+			return
+		case <-mainCtx.Done():
+			cancel()
+			s.log.Infow("", "sync_manager", "exits")
 			return
 		}
 	}
@@ -470,6 +481,12 @@ func SyncChain(l log.Logger, store CallbackStore, req SyncRequest, stream SyncSt
 	}
 
 	send := func(b *chain.Beacon) error {
+		select {
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+		default:
+		}
+
 		packet := beaconToProto(b)
 		packet.Metadata = &common.Metadata{BeaconID: beaconID}
 		err := stream.Send(packet)

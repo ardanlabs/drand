@@ -76,6 +76,7 @@ func (g *grpcClient) loadEnvironment() {
 func (g *grpcClient) getTimeoutContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	g.Lock()
 	defer g.Unlock()
+
 	clientDeadline := time.Now().Add(g.timeout)
 	return context.WithDeadline(ctx, clientDeadline)
 }
@@ -198,8 +199,11 @@ func (g *grpcClient) PartialBeacon(ctx context.Context, p Peer, in *drand.Partia
 	if err != nil {
 		return err
 	}
+
 	client := drand.NewProtocolClient(c)
-	ctx, _ = g.getTimeoutContext(ctx)
+	ctx, cancel := g.getTimeoutContext(ctx)
+	defer cancel()
+
 	_, err = client.PartialBeacon(ctx, in, opts...)
 	return err
 }

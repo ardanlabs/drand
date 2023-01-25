@@ -40,7 +40,13 @@ func (s *Store) Len(_ context.Context) (int, error) {
 	return len(s.store), nil
 }
 
-func (s *Store) Put(_ context.Context, beacon *chain.Beacon) error {
+func (s *Store) Put(ctx context.Context, beacon *chain.Beacon) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	s.storeMtx.Lock()
 	defer s.storeMtx.Unlock()
 	defer func() {

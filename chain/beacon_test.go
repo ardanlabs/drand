@@ -44,6 +44,7 @@ func Test_shortSigStr(t *testing.T) {
 		want string
 	}{
 		"test with valid data": {sig: []byte("some valid sig here"), want: "736f6d"},
+		"test with small valid data": {sig: []byte("va"), want: "7661"},
 		"nil sig":              {sig: nil, want: "nil"},
 		"zero length sig":      {sig: []byte{}, want: ""},
 	}
