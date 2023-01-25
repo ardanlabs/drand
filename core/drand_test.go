@@ -15,7 +15,6 @@ import (
 	"github.com/weaveworks/common/fs"
 
 	"github.com/drand/drand/chain"
-	"github.com/drand/drand/chain/boltdb"
 	"github.com/drand/drand/common/scheme"
 	"github.com/drand/drand/key"
 	"github.com/drand/drand/net"
@@ -813,16 +812,8 @@ func expectChanFail(t *testing.T, errCh chan error) {
 }
 
 // This test makes sure the "FollowChain" grpc method works fine
-func TestDrandFollowChain(t *testing.T) {
-	testDrandFollowChain(t, false)
-}
-
-func TestDrandFollowChainNewBoltFormat(t *testing.T) {
-	testDrandFollowChain(t, true)
-}
-
 //nolint:funlen // This is a test function
-func testDrandFollowChain(t *testing.T, newFormat bool) {
+func TestDrandFollowChain(t *testing.T) {
 	n, p := 4, 1*time.Second
 	sch, beaconID := scheme.GetSchemeFromEnv(), test.GetBeaconIDFromEnv()
 
@@ -920,9 +911,6 @@ func testDrandFollowChain(t *testing.T, newFormat bool) {
 		// (Postgres) Database operations need to have a proper context to work.
 		// We create a new one, since we canceled the previous one.
 		ctx = context.Background()
-		if newFormat {
-			ctx = boltdb.IsATest(ctx)
-		}
 
 		// check if the beacon is in the database
 		store := newNode.drand.dbStore
