@@ -813,8 +813,6 @@ func expectChanFail(t *testing.T, errCh chan error) {
 }
 
 // This test makes sure the "FollowChain" grpc method works fine
-//
-//nolint:funlen
 func TestDrandFollowChain(t *testing.T) {
 	testDrandFollowChain(t, false)
 }
@@ -823,6 +821,7 @@ func TestDrandFollowChainNewBoltFormat(t *testing.T) {
 	testDrandFollowChain(t, true)
 }
 
+//nolint:funlen // This is a test function
 func testDrandFollowChain(t *testing.T, newFormat bool) {
 	n, p := 4, 1*time.Second
 	sch, beaconID := scheme.GetSchemeFromEnv(), test.GetBeaconIDFromEnv()
