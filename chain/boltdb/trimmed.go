@@ -17,7 +17,7 @@ import (
 // golang implementation). Internally, Beacons are stored as JSON-encoded in the
 // db file.
 //
-//nolint:gocritic// We do want to have a mutex here
+//nolint:gocritic // We do want to have a mutex here
 type trimmedStore struct {
 	sync.Mutex
 	db *bolt.DB
