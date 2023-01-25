@@ -464,11 +464,6 @@ func (p *Store) getBeacon(ctx context.Context, canFetchPrevious bool, query stri
 		return nil, err
 	}
 
-	p.log.Debugw("florin: p.getBeacon() -> previous ->",
-		"canFetchPrevious", canFetchPrevious,
-		"p.requiresPrevious", p.requiresPrevious,
-		"ret.Round", ret.Round,
-	)
 	if canFetchPrevious &&
 		p.requiresPrevious &&
 		ret.Round > 0 {
