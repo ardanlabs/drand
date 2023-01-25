@@ -8,6 +8,7 @@ import (
 	"path"
 	"sync"
 
+	json "github.com/nikkolasg/hexjson"
 	bolt "go.etcd.io/bbolt"
 
 	"github.com/drand/drand/chain"
@@ -39,7 +40,7 @@ type newDBFormat bool
 
 var useNewDBFormat newDBFormat = true
 
-func isATest(ctx context.Context) context.Context {
+func IsATest(ctx context.Context) context.Context {
 	return context.WithValue(ctx, useNewDBFormat, useNewDBFormat)
 }
 
@@ -52,11 +53,8 @@ func isThisATest(ctx context.Context) bool {
 func NewBoltStore(ctx context.Context, l log.Logger, folder string, opts *bolt.Options) (chain.Store, error) {
 	dbPath := path.Join(folder, BoltFileName)
 
-	if _, err := os.Stat(dbPath); errors.Is(err, os.ErrNotExist) {
-		// This is a guard for the tests right now
-		if !isThisATest(ctx) {
-			return newTrimmedStore(ctx, l, folder, opts)
-		}
+	if shouldUseTrimmedBolt(ctx, dbPath, opts) {
+		return newTrimmedStore(ctx, l, folder, opts)
 	}
 
 	db, err := bolt.Open(dbPath, BoltStoreOpenPerm, opts)
@@ -73,6 +71,35 @@ func NewBoltStore(ctx context.Context, l log.Logger, folder string, opts *bolt.O
 		log: l,
 		db:  db,
 	}, err
+}
+
+func shouldUseTrimmedBolt(ctx context.Context, sourceBeaconPath string, opts *bolt.Options) bool {
+	if isThisATest(ctx) {
+		return false
+	}
+
+	// New beacons stores should use the trimmed version
+	if _, err := os.Stat(sourceBeaconPath); errors.Is(err, os.ErrNotExist) {
+		return true
+	}
+
+	// Existing beacon stores should use the format that's suitable
+	existingDB, err := bolt.Open(sourceBeaconPath, 0600, opts)
+	if err != nil {
+		return true
+	}
+	defer func() {
+		_ = existingDB.Close()
+	}()
+
+	err = existingDB.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(beaconBucket)
+		_, value := bucket.Cursor().First()
+		b := chain.Beacon{}
+		return json.Unmarshal(value, &b)
+	})
+
+	return err != nil
 }
 
 // Len performs a big scan over the bucket and is _very_ slow - use sparingly!

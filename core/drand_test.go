@@ -15,6 +15,7 @@ import (
 	"github.com/weaveworks/common/fs"
 
 	"github.com/drand/drand/chain"
+	"github.com/drand/drand/chain/boltdb"
 	"github.com/drand/drand/common/scheme"
 	"github.com/drand/drand/key"
 	"github.com/drand/drand/net"
@@ -815,6 +816,14 @@ func expectChanFail(t *testing.T, errCh chan error) {
 //
 //nolint:funlen
 func TestDrandFollowChain(t *testing.T) {
+	testDrandFollowChain(t, false)
+}
+
+func TestDrandFollowChainNewBoltFormat(t *testing.T) {
+	testDrandFollowChain(t, true)
+}
+
+func testDrandFollowChain(t *testing.T, newFormat bool) {
 	n, p := 4, 1*time.Second
 	sch, beaconID := scheme.GetSchemeFromEnv(), test.GetBeaconIDFromEnv()
 
@@ -912,11 +921,14 @@ func TestDrandFollowChain(t *testing.T) {
 		// (Postgres) Database operations need to have a proper context to work.
 		// We create a new one, since we canceled the previous one.
 		ctx = context.Background()
+		if newFormat {
+			ctx = boltdb.IsATest(ctx)
+		}
 
 		// check if the beacon is in the database
 		store := newNode.drand.dbStore
 		if newNode.drand.opts.dbStorageEngine == chain.BoltDB {
-			store, err = newNode.drand.createDBStore()
+			store, err = newNode.drand.createDBStore(ctx)
 			require.NoError(t, err)
 		}
 		require.NoError(t, err)
@@ -1008,7 +1020,7 @@ func TestDrandCheckChain(t *testing.T) {
 	t.Logf(" \t\t --> Done, proceeding to modify store now.\n")
 	store := dt.nodes[0].drand.dbStore
 	if dt.nodes[0].drand.opts.dbStorageEngine == chain.BoltDB {
-		store, err = dt.nodes[0].drand.createDBStore()
+		store, err = dt.nodes[0].drand.createDBStore(ctx)
 		require.NoError(t, err)
 	}
 

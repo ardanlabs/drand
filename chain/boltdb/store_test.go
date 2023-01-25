@@ -14,7 +14,7 @@ import (
 
 func TestStoreBoltOrder(t *testing.T) {
 	tmp := t.TempDir()
-	ctx := isATest(context.Background())
+	ctx := IsATest(context.Background())
 	l := test.Logger(t)
 	store, err := NewBoltStore(ctx, l, tmp, nil)
 	require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestStoreBoltOrder(t *testing.T) {
 
 func TestStoreBolt(t *testing.T) {
 	tmp := t.TempDir()
-	ctx := isATest(context.Background())
+	ctx := IsATest(context.Background())
 	l := test.Logger(t)
 
 	var sig1 = []byte{0x01, 0x02, 0x03}
@@ -156,7 +156,7 @@ func TestStoreBolt(t *testing.T) {
 
 func TestStore_Cursor(t *testing.T) {
 	tmp := t.TempDir()
-	ctx := isATest(context.Background())
+	ctx := IsATest(context.Background())
 	l := test.Logger(t)
 	dbStore, err := NewBoltStore(ctx, l, tmp, nil)
 	require.NoError(t, err)
