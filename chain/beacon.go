@@ -59,6 +59,13 @@ func (b *Beacon) String() string {
 }
 
 func shortSigStr(sig []byte) string {
+	if sig == nil {
+		return "nil"
+	}
+	if len(sig) == 0 {
+		return ""
+	}
+
 	max := 3
 	if len(sig) < max {
 		max = len(sig)
