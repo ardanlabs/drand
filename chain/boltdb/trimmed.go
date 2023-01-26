@@ -2,6 +2,7 @@ package boltdb
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"path"
 	"sync"
@@ -122,6 +123,7 @@ func (b *trimmedStore) Last(ctx context.Context) (*chain.Beacon, error) {
 		*beacon = *b
 		return nil
 	})
+	fmt.Printf("florin: trimmedStore.Last() %#v\n", beacon)
 	return beacon, err
 }
 
@@ -138,6 +140,7 @@ func (b *trimmedStore) Get(_ context.Context, round uint64) (*chain.Beacon, erro
 		*beacon = *b
 		return nil
 	})
+	fmt.Printf("florin: trimmedStore.Get() %#v\n", beacon)
 	return beacon, err
 }
 
@@ -247,12 +250,17 @@ func (b *trimmedStore) getCursorBeacon(bucket *bolt.Bucket, get beaconCursorGett
 		Signature: sig,
 	}
 
+	fmt.Printf("florin: trimmedStore.Cursor.getCursorBeacon() %#v\n", beacon)
+
 	if b.requiresPrevious &&
 		beacon.Round > 0 {
 		prevBeacon, err := b.getBeacon(bucket, beacon.Round-1, false)
 		if err != nil {
 			return nil, err
 		}
+
+		fmt.Printf("florin: trimmedStore.Last()#prevBeacon %#v\n", prevBeacon)
+
 		if prevBeacon == nil {
 			b.log.Errorw("missing previous beacon from database", "round", beacon.Round-1)
 			return nil, chainerrors.ErrNoBeaconStored

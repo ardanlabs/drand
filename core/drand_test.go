@@ -776,6 +776,9 @@ func TestDrandPublicStream(t *testing.T) {
 	// try fetching with round 0 -> get latest
 	t.Logf("Streaming for rounds starting from %d to %d", 0, maxRound)
 
+	client.(net.Stoppable).Stop()
+	time.Sleep(1*time.Second)
+
 	respCh, err = client.PublicRandStream(ctx, root.drand.priv.Public, new(drand.PublicRandRequest))
 	require.NoError(t, err)
 
@@ -796,6 +799,10 @@ func TestDrandPublicStream(t *testing.T) {
 	case <-time.After(50 * time.Millisecond):
 		// correct
 	}
+
+	client.(net.Stoppable).Stop()
+	time.Sleep(1*time.Second)
+	t.Log("florin: test done successfully")
 }
 
 func expectChanFail(t *testing.T, errCh chan error) {

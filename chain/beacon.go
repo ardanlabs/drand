@@ -55,6 +55,7 @@ func RandomnessFromSignature(sig []byte) []byte {
 }
 
 func (b *Beacon) String() string {
+	fmt.Printf("florin: beacon.String() %#v\n", b)
 	return fmt.Sprintf("{ round: %d, sig: %s, prevSig: %s }", b.Round, shortSigStr(b.Signature), shortSigStr(b.PreviousSig))
 }
 
