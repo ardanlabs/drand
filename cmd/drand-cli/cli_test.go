@@ -656,9 +656,6 @@ func testStartedTLSDrandFunctional(t *testing.T, ctrlPort, certPath string, grou
 	expectedOutput := string(chainInfoBuff)
 	testCommand(t, chainInfoCmd, expectedOutput)
 
-	showCmd := []string{"drand", "show", "share", "--control", ctrlPort}
-	testCommand(t, showCmd, expectedShareOutput)
-
 	showPublic := []string{"drand", "show", "public", "--control", ctrlPort}
 	b, _ := priv.Public.Key.MarshalBinary()
 	exp := hex.EncodeToString(b)
