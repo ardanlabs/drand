@@ -60,6 +60,8 @@ const (
 var DefaultLevel = LogInfo
 
 // Allows the debug logs to be printed in envs where the test logs are set to debug level.
+//
+//nolint:gochecknoinits // We do want to overwrite the default log level here
 func init() {
 	debugEnv, isDebug := os.LookupEnv("DRAND_TEST_LOGS")
 	if isDebug && debugEnv == "DEBUG" {
