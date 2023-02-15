@@ -34,8 +34,6 @@ import (
 	"github.com/drand/kyber/util/random"
 )
 
-const expectedShareOutput = "0000000000000000000000000000000000000000000000000000000000000001"
-
 func TestMigrate(t *testing.T) {
 	tmp := getSBFolderStructure(t)
 
