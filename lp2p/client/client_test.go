@@ -40,16 +40,15 @@ func TestGRPCClientTestFunc(t *testing.T) {
 	identityDir := t.TempDir()
 
 	infoProto, err := svc.ChainInfo(context.Background(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	info, _ := chain.InfoFromProto(infoProto)
+	require.NoError(t, err)
+
+	info, err := chain.InfoFromProto(infoProto)
+	require.NoError(t, err)
 
 	// start mock relay-node
 	grpcClient, err := grpc.New(grpcAddr, "", true, []byte(""))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	cfg := &lp2p.GossipRelayConfig{
 		ChainHash:    info.HashString(),
 		PeerWith:     nil,
@@ -59,40 +58,41 @@ func TestGRPCClientTestFunc(t *testing.T) {
 		Client:       grpcClient,
 	}
 	g, err := lp2p.NewGossipRelayNode(log.DefaultLogger(), cfg)
-	if err != nil {
-		t.Fatalf("gossip relay node (%v)", err)
-	}
+	require.NoError(t, err, "gossip relay node")
 	defer g.Shutdown()
 
 	// start client
 	c, err := newTestClient(t, g.Multiaddrs(), info)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	require.NoError(t, err)
+	defer func() {
+		err := c.Close()
+		require.NoError(t, err)
+	}()
 
 	// test client
 	ctx, cancel := context.WithCancel(context.Background())
 	ch := c.Watch(ctx)
+
+	mockService := svc.(mock.MockService)
 	for i := 0; i < 3; i++ {
 		// pub sub polls every 200ms
 		time.Sleep(250 * time.Millisecond)
-		svc.(mock.MockService).EmitRand(false)
-		fmt.Printf("round %d. emitted.\n", i)
+		mockService.EmitRand(false)
+		t.Logf("round %d emitted\n", i)
+
 		select {
 		case r, ok := <-ch:
-			if !ok {
-				t.Fatal("expected randomness, watch outer channel was closed instead")
-			} else {
-				t.Log("received", r.Round())
-			}
+			require.True(t, ok, "expected randomness, watch outer channel was closed instead")
+			t.Logf("received round %d\n", r.Round())
 		// the period of the mock servers is 1 second
 		case <-time.After(5 * time.Second):
 			t.Fatal("timeout.")
 		}
 	}
-	svc.(mock.MockService).EmitRand(true)
+
+	mockService.EmitRand(true)
 	cancel()
+
 	drain(t, ch, 5*time.Second)
 }
 
