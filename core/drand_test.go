@@ -405,58 +405,31 @@ func TestRunDKGReshareTimeout(t *testing.T) {
 	t.Log("Setup reshare done. Starting reshare.")
 
 	// run the resharing
-	doneReshare := make(chan *key.Group)
-	go func() {
-		t.Log("[reshare] Start reshare")
-		// XXX: notice that the RunReshare is already running AdvanceMockClock on its own after a while!!
-		group, err := dt.RunReshare(t,
-			&reshareConfig{
-				oldRun:  nodesToKeep,
-				newRun:  nodesToAdd,
-				newThr:  newThreshold,
-				timeout: timeout,
-			})
-		require.NoError(t, err)
-		doneReshare <- group
-	}()
-	time.Sleep(3 * time.Second)
-
-	// TODO: How to remove this sleep? How to check when a node is at this stage
-	// at this point in time, nodes should have gotten all deals and send back their responses to all nodes
-	time.Sleep(getSleepDuration())
-
-	// TODO: How to remove this sleep? How to check when a node is at this stage
-	t.Log("Move to finish phase")
-	dt.AdvanceMockClock(t, timeout)
-
-	time.Sleep(getSleepDuration())
-
-	var resharedGroup *key.Group
-	select {
-	case resharedGroup = <-doneReshare:
-	case <-time.After(3 * time.Second):
-		require.True(t, false)
-	}
-
+	t.Log("[reshare] Start reshare")
+	resharedGroup, err := dt.RunReshare(t,
+		&reshareConfig{
+			oldRun:  nodesToKeep,
+			newRun:  nodesToAdd,
+			newThr:  newThreshold,
+			timeout: timeout,
+		})
+	require.NoError(t, err)
+	require.NotNil(t, resharedGroup)
 	t.Logf("[reshare] Group: %s", resharedGroup)
 
-	require.NotNil(t, resharedGroup)
-
-	transitionTime := resharedGroup.TransitionTime
-	now := dt.Now().Unix()
-
-	// move to the transition time period by period - do not skip potential
-	// periods as to emulate the normal time behavior
-	for now < transitionTime-1 {
+	for {
 		dt.AdvanceMockClock(t, beaconPeriod)
-		t.Log("Check Beacon Public on Leader")
+		time.Sleep(getSleepDuration())
 		dt.CheckPublicBeacon(dt.Ids(1, false)[0], false)
-		now = dt.Now().Unix()
+		if dt.clock.Now().Unix() >= resharedGroup.TransitionTime {
+			break
+		}
 	}
 
-	// move to the transition time
-	dt.SetMockClock(t, resharedGroup.TransitionTime)
-	time.Sleep(getSleepDuration())
+	for i := 0; i < 3; i++ {
+		dt.AdvanceMockClock(t, beaconPeriod)
+		time.Sleep(getSleepDuration())
+	}
 
 	// test that all nodes in the new group have generated a new beacon
 	root := dt.resharedNodes[0].drand
@@ -467,6 +440,9 @@ func TestRunDKGReshareTimeout(t *testing.T) {
 	defer cancel()
 	resp, err := client.PublicRand(ctx, rootID, new(drand.PublicRandRequest))
 	require.NoError(t, err)
+
+	dt.AdvanceMockClock(t, beaconPeriod)
+	time.Sleep(getSleepDuration())
 
 	// moving another round to make sure all nodes have time to sync in case one missed a beat
 	dt.SetMockClock(t, resharedGroup.TransitionTime)
