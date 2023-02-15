@@ -554,13 +554,12 @@ func testListSchemes(t *testing.T, ctrlPort string) {
 
 //nolint:funlen //This is a test
 func TestClientTLS(t *testing.T) {
-	t.Skipf("test fails when error checking commands")
 	sch, err := crypto.GetSchemeFromEnv()
 	require.NoError(t, err)
 	beaconID := test.GetBeaconIDFromEnv()
 
 	tmpPath := path.Join(t.TempDir(), "drand")
-	os.Mkdir(tmpPath, 0o740)
+	require.NoError(t, os.Mkdir(tmpPath, 0o740))
 
 	groupPath := path.Join(tmpPath, "group.toml")
 	certPath := path.Join(tmpPath, "server.pem")
@@ -834,7 +833,6 @@ func TestDrandLoadNotPresentBeacon(t *testing.T) {
 }
 
 func TestDrandStatus(t *testing.T) {
-	t.Skipf("test fails when error checking commands")
 	n := 4
 	instances := genAndLaunchDrandInstances(t, n)
 	allAddresses := make([]string, 0, n)
