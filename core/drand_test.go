@@ -373,9 +373,6 @@ func TestRunDKGReshareAbsentNode(t *testing.T) {
 //
 //nolint:funlen
 func TestRunDKGReshareTimeout(t *testing.T) {
-	if os.Getenv("CI") != "" {
-		t.Skip("Fails all the time on CI for some reason")
-	}
 	oldNodes, newNodes, oldThreshold, newThreshold := 3, 4, 2, 3
 	timeout, beaconPeriod := 1*time.Second, 2*time.Second
 	offline := 1
@@ -493,10 +490,6 @@ func TestRunDKGReshareTimeout(t *testing.T) {
 //
 //nolint:funlen
 func TestRunDKGResharePreempt(t *testing.T) {
-	if os.Getenv("CI") != "" {
-		t.Skip("Skipping testing in CI environment")
-	}
-
 	oldN := 3
 	newN := 3
 	Thr := 2

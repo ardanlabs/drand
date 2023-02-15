@@ -27,7 +27,6 @@ import (
 )
 
 func TestGRPCClientTestFunc(t *testing.T) {
-	t.Skip("TestGRPCClientTestFunc is flaky")
 	// start mock drand node
 	sch, err := crypto.GetSchemeFromEnv()
 	require.NoError(t, err)
