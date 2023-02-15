@@ -73,23 +73,28 @@ func TestGRPCClientTestFunc(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ch := c.Watch(ctx)
 
+	baseRound := uint64(1969)
+
 	mockService := svc.(mock.MockService)
-	for i := 0; i < 3; i++ {
+	for i := uint64(0); i < 3; i++ {
 		// pub sub polls every 200ms
 		time.Sleep(250 * time.Millisecond)
 		mockService.EmitRand(false)
-		t.Logf("round %d emitted\n", i)
+		t.Logf("round %d emitted\n", baseRound+i)
 
 		select {
 		case r, ok := <-ch:
 			require.True(t, ok, "expected randomness, watch outer channel was closed instead")
 			t.Logf("received round %d\n", r.Round())
+			require.Equal(t, baseRound+i, r.Round())
 		// the period of the mock servers is 1 second
 		case <-time.After(5 * time.Second):
 			t.Fatal("timeout.")
 		}
 	}
 
+	// pub sub polls every 200ms
+	time.Sleep(250 * time.Millisecond)
 	mockService.EmitRand(true)
 	cancel()
 

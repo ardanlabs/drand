@@ -57,7 +57,15 @@ const (
 // DefaultLevel is the default level where statements are logged. Change the
 // value of this variable before init() to change the level of the default
 // logger.
-const DefaultLevel = LogInfo
+var DefaultLevel = LogInfo
+
+// Allows the debug logs to be printed in envs where the test logs are set to debug level.
+func init() {
+	debugEnv, isDebug := os.LookupEnv("DRAND_TEST_LOGS")
+	if isDebug && debugEnv == "DEBUG" {
+		DefaultLevel = LogDebug
+	}
+}
 
 var isDefaultLoggerSet sync.Once
 

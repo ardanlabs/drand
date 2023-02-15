@@ -82,20 +82,27 @@ func NewWithPubsub(ps *pubsub.PubSub, info *chain.Info, cache client.Cache) (*Cl
 		for {
 			msg, err := s.Next(ctx)
 			if ctx.Err() != nil {
+				c.log.Errorw("NewPubSub closing because context was canceled", "msg", msg, "err", ctx.Err())
+
+				s.Cancel()
+				err := t.Close()
+				if err != nil {
+					c.log.Errorw("NewPubSub closing goroutine for topic", "err", err)
+				}
+
 				c.subs.Lock()
 				for _, ch := range c.subs.M {
 					close(ch)
 				}
 				c.subs.M = make(map[*int]chan drand.PublicRandResponse)
 				c.subs.Unlock()
-				t.Close()
-				s.Cancel()
 				return
 			}
 			if err != nil {
 				c.log.Warnw("", "gossip client", "topic.Next error", "err", err)
 				continue
 			}
+
 			var rand drand.PublicRandResponse
 			err = proto.Unmarshal(msg.Data, &rand)
 			if err != nil {
@@ -106,10 +113,12 @@ func NewWithPubsub(ps *pubsub.PubSub, info *chain.Info, cache client.Cache) (*Cl
 			// TODO: verification, need to pass drand network public key in
 
 			if c.latest >= rand.Round {
+				c.log.Debugw("received round older than the latest previously received one", "latest", c.latest, "round", rand.Round)
 				continue
 			}
 			c.latest = rand.Round
 
+			c.log.Debugw("newPubSub broadcasting round to listeners", "round", rand.Round)
 			c.subs.Lock()
 			for _, ch := range c.subs.M {
 				select {
@@ -119,6 +128,7 @@ func NewWithPubsub(ps *pubsub.PubSub, info *chain.Info, cache client.Cache) (*Cl
 				}
 			}
 			c.subs.Unlock()
+			c.log.Debugw("newPubSub finished broadcasting round to listeners", "round", rand.Round)
 		}
 	}()
 
