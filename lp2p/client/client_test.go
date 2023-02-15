@@ -76,9 +76,10 @@ func TestGRPCClientTestFunc(t *testing.T) {
 	baseRound := uint64(1969)
 
 	mockService := svc.(mock.MockService)
+	// pub sub polls every 200ms
+	wait := 250 * time.Millisecond
 	for i := uint64(0); i < 3; i++ {
-		// pub sub polls every 200ms
-		time.Sleep(250 * time.Millisecond)
+		time.Sleep(wait)
 		mockService.EmitRand(false)
 		t.Logf("round %d emitted\n", baseRound+i)
 
@@ -93,8 +94,7 @@ func TestGRPCClientTestFunc(t *testing.T) {
 		}
 	}
 
-	// pub sub polls every 200ms
-	time.Sleep(250 * time.Millisecond)
+	time.Sleep(wait)
 	mockService.EmitRand(true)
 	cancel()
 

@@ -84,7 +84,7 @@ func NewWithPubsub(ps *pubsub.PubSub, info *chain.Info, cache client.Cache) (*Cl
 		for {
 			msg, err := s.Next(ctx)
 			if ctx.Err() != nil {
-				c.log.Errorw("NewPubSub closing because context was canceled", "msg", msg, "err", ctx.Err())
+				c.log.Debugw("NewPubSub closing because context was canceled", "msg", msg, "err", ctx.Err())
 
 				s.Cancel()
 				err := t.Close()

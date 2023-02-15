@@ -192,6 +192,6 @@ func TestMemDBBeaconJoinsNetworkAfterDKG(t *testing.T) {
 	ts.AdvanceMockClock(t, period)
 	time.Sleep(getSleepDuration())
 
-	err = ts.WaitUntilRound(t, memDBNode, 11)
+	err = ts.WaitUntilRound(t, memDBNode, 12)
 	require.NoError(t, err)
 }
