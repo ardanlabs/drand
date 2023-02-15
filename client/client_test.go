@@ -168,7 +168,6 @@ func TestClientWithoutCache(t *testing.T) {
 }
 
 func TestClientWithWatcher(t *testing.T) {
-	t.Skipf("Skip flaky test")
 	sch, err := crypto.GetSchemeFromEnv()
 	require.NoError(t, err)
 	info, results := mock.VerifiableResults(2, sch)
