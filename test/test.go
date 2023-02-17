@@ -4,6 +4,7 @@ package test
 
 import (
 	"encoding/hex"
+	"fmt"
 	n "net"
 	"os"
 	"path"
@@ -216,4 +217,13 @@ func StringToPoint(s string) (kyber.Point, error) {
 func GetBeaconIDFromEnv() string {
 	beaconID := os.Getenv("BEACON_ID")
 	return commonutils.GetCanonicalBeaconID(beaconID)
+}
+
+// Deprecated: do not use sleeps in your tests
+func GetSleepDuration() time.Duration {
+	if os.Getenv("CI") != "" {
+		fmt.Println("--- Sleeping on CI")
+		return time.Duration(800) * time.Millisecond
+	}
+	return time.Duration(100) * time.Millisecond
 }

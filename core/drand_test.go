@@ -419,7 +419,7 @@ func TestRunDKGReshareTimeout(t *testing.T) {
 
 	for {
 		dt.AdvanceMockClock(t, beaconPeriod)
-		time.Sleep(getSleepDuration())
+		time.Sleep(test.GetSleepDuration())
 		dt.CheckPublicBeacon(dt.Ids(1, false)[0], false)
 		if dt.clock.Now().Unix() >= resharedGroup.TransitionTime {
 			break
@@ -428,7 +428,7 @@ func TestRunDKGReshareTimeout(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		dt.AdvanceMockClock(t, beaconPeriod)
-		time.Sleep(getSleepDuration())
+		time.Sleep(test.GetSleepDuration())
 	}
 
 	// test that all nodes in the new group have generated a new beacon
@@ -442,11 +442,11 @@ func TestRunDKGReshareTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	dt.AdvanceMockClock(t, beaconPeriod)
-	time.Sleep(getSleepDuration())
+	time.Sleep(test.GetSleepDuration())
 
 	// moving another round to make sure all nodes have time to sync in case one missed a beat
 	dt.SetMockClock(t, resharedGroup.TransitionTime)
-	time.Sleep(getSleepDuration())
+	time.Sleep(test.GetSleepDuration())
 	for _, n := range dt.resharedNodes[1:] {
 		// Make sure we pull the same round from the rest of the nodes as we received from the leader
 		req := &drand.PublicRandRequest{Round: resp.Round}
@@ -454,7 +454,7 @@ func TestRunDKGReshareTimeout(t *testing.T) {
 		resp2, err := client.PublicRand(ctx, n.drand.priv.Public, req)
 		if errors.Is(err, derrors.ErrNoBeaconStored) {
 			t.Logf("[reshare] ErrNoBeaconStored: retrying request for %s", n.addr)
-			time.Sleep(getSleepDuration())
+			time.Sleep(test.GetSleepDuration())
 			resp2, err = client.PublicRand(ctx, n.drand.priv.Public, req)
 		}
 		require.NoError(t, err)
@@ -535,7 +535,7 @@ func TestRunDKGResharePreempt(t *testing.T) {
 	// TODO: How to remove this sleep? How to check when a node is at this stage
 	// at this point in time, nodes should have gotten all deals and send back
 	// their responses to all nodes
-	time.Sleep(getSleepDuration())
+	time.Sleep(test.GetSleepDuration())
 
 	t.Log("Move to justification phase")
 	dt.AdvanceMockClock(t, timeout)
@@ -543,12 +543,12 @@ func TestRunDKGResharePreempt(t *testing.T) {
 	// TODO: How to remove this sleep? How to check when a node is at this stage
 	// at this time, all nodes received the responses of each other nodes but
 	// there is one node missing so they expect justifications
-	time.Sleep(getSleepDuration())
+	time.Sleep(test.GetSleepDuration())
 
 	// TODO: How to remove this sleep? How to check when a node is at this stage
 	t.Log("Move to finish phase")
 	dt.AdvanceMockClock(t, timeout)
-	time.Sleep(getSleepDuration())
+	time.Sleep(test.GetSleepDuration())
 
 	// at this time they received no justification from the missing node so he's
 	// exlucded of the group and the dkg should finish
@@ -808,7 +808,7 @@ func TestDrandPublicStream(t *testing.T) {
 	}
 
 	dt.AdvanceMockClock(t, group.Period)
-	time.Sleep(getSleepDuration())
+	time.Sleep(test.GetSleepDuration())
 
 	select {
 	case resp := <-respCh:

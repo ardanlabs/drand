@@ -144,13 +144,13 @@ func TestMemDBBeaconJoinsNetworkAfterDKG(t *testing.T) {
 	require.NoError(t, err)
 
 	ts.SetMockClock(t, group.GenesisTime)
-	time.Sleep(getSleepDuration())
+	time.Sleep(test.GetSleepDuration())
 
 	err = ts.WaitUntilChainIsServing(t, ts.nodes[0])
 	require.NoError(t, err)
 
 	ts.AdvanceMockClock(t, period)
-	time.Sleep(getSleepDuration())
+	time.Sleep(test.GetSleepDuration())
 
 	err = ts.WaitUntilRound(t, ts.nodes[0], 2)
 	require.NoError(t, err)
@@ -173,24 +173,24 @@ func TestMemDBBeaconJoinsNetworkAfterDKG(t *testing.T) {
 
 	for {
 		ts.AdvanceMockClock(t, period)
-		time.Sleep(getSleepDuration())
+		time.Sleep(test.GetSleepDuration())
 		if ts.clock.Now().Unix() >= newGroup.TransitionTime {
 			break
 		}
 	}
 
 	ts.AdvanceMockClock(t, newGroup.Period)
-	time.Sleep(getSleepDuration())
+	time.Sleep(test.GetSleepDuration())
 
 	t.Log("running WaitUntilChainIsServing")
 	err = ts.WaitUntilChainIsServing(t, memDBNode)
 	require.NoError(t, err)
 
 	ts.AdvanceMockClock(t, period)
-	time.Sleep(getSleepDuration())
+	time.Sleep(test.GetSleepDuration())
 
 	ts.AdvanceMockClock(t, period)
-	time.Sleep(getSleepDuration())
+	time.Sleep(test.GetSleepDuration())
 
 	err = ts.WaitUntilRound(t, memDBNode, 12)
 	require.NoError(t, err)

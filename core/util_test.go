@@ -192,15 +192,6 @@ func CloseAllDrands(drands []*BeaconProcess) {
 	}
 }
 
-// Deprecated: do not use sleeps in your tests
-func getSleepDuration() time.Duration {
-	if os.Getenv("CI") != "" {
-		fmt.Println("--- Sleeping on CI")
-		return time.Duration(800) * time.Millisecond
-	}
-	return time.Duration(100) * time.Millisecond
-}
-
 // NewDrandTest creates a drand test scenario with initial n nodes and ready to
 // run a DKG for the given threshold that will then launch the beacon with the
 // specified period

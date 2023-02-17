@@ -154,6 +154,7 @@ func (c *Client) Sub(ch chan drand.PublicRandResponse) UnsubFunc {
 	c.subs.M[id] = ch
 	c.subs.Unlock()
 	return func() {
+		c.log.Debugw("closing sub")
 		c.subs.Lock()
 		delete(c.subs.M, id)
 		close(ch)

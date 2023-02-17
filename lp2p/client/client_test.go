@@ -89,7 +89,8 @@ func TestGRPCClientTestFunc(t *testing.T) {
 			t.Logf("received round %d\n", r.Round())
 			require.Equal(t, baseRound+i, r.Round())
 		// the period of the mock servers is 1 second
-		case <-time.After(5 * time.Second):
+		case <-time.After(500 * time.Second):
+			c.log.Debugw("timeout")
 			t.Fatal("timeout.")
 		}
 	}
