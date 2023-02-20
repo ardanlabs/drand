@@ -219,7 +219,6 @@ func GetBeaconIDFromEnv() string {
 	return commonutils.GetCanonicalBeaconID(beaconID)
 }
 
-// Deprecated: do not use sleeps in your tests
 func GetSleepDuration() time.Duration {
 	if os.Getenv("CI") != "" {
 		fmt.Println("--- Sleeping on CI")
