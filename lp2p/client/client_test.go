@@ -77,7 +77,7 @@ func TestGRPCClientTestFunc(t *testing.T) {
 
 	mockService := svc.(mock.MockService)
 	// pub sub polls every 200ms
-	wait := 250 * time.Millisecond
+	wait := 1 * time.Second
 	for i := uint64(0); i < 3; i++ {
 		time.Sleep(wait)
 		mockService.EmitRand(false)
@@ -89,8 +89,7 @@ func TestGRPCClientTestFunc(t *testing.T) {
 			t.Logf("received round %d\n", r.Round())
 			require.Equal(t, baseRound+i, r.Round())
 		// the period of the mock servers is 1 second
-		case <-time.After(500 * time.Second):
-			c.log.Debugw("timeout")
+		case <-time.After(5 * time.Second):
 			t.Fatal("timeout.")
 		}
 	}

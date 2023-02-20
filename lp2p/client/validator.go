@@ -24,6 +24,8 @@ func randomnessValidator(info *chain.Info, cache client.Cache, c *Client) pubsub
 			return pubsub.ValidationReject
 		}
 
+		c.log.Debugw("", "gossip validator", "Received new round", "round", rand.GetRound())
+
 		if info == nil {
 			c.log.Warnw("", "gossip validator", "Not validating received randomness due to lack of trust root.")
 			return pubsub.ValidationAccept
@@ -32,7 +34,6 @@ func randomnessValidator(info *chain.Info, cache client.Cache, c *Client) pubsub
 		// Unwilling to relay beacons in the future.
 		timeNow := time.Now()
 		timeOfRound := chain.TimeOfRound(info.Period, info.GenesisTime, rand.GetRound())
-		_ = chain.TimeOfRound(time.Duration(5 * time.Millisecond), info.GenesisTime, rand.GetRound())
 		if time.Unix(timeOfRound, 0).After(timeNow) {
 			c.log.Warnw("",
 				"gossip validator", "Not validating received randomness due to time of round",
