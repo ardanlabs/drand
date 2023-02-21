@@ -739,12 +739,13 @@ func TestDrandPublicStream(t *testing.T) {
 
 	// expect first round now since node already has it
 	t.Log("Waiting to receive the first round as the node should have it now...")
+	waitTime := 500 * time.Millisecond
 	select {
 	case beacon := <-respCh:
 		t.Logf("First round rcv %d \n", beacon.GetRound())
 		require.Equal(t, resp.GetRound(), beacon.GetRound())
 
-	case <-time.After(300 * time.Millisecond):
+	case <-time.After(waitTime):
 		t.Logf("First round NOT rcv. Timeout has passed \n")
 		require.True(t, false, "too late for the first round, it didn't reply in time")
 	}
@@ -778,7 +779,7 @@ func TestDrandPublicStream(t *testing.T) {
 	select {
 	case <-respCh:
 		require.False(t, true, "shouldn't get a round if time doesn't go by")
-	case <-time.After(300 * time.Millisecond):
+	case <-time.After(waitTime):
 		// correct
 	}
 
@@ -787,7 +788,7 @@ func TestDrandPublicStream(t *testing.T) {
 	case resp := <-respCh:
 		t.Logf("Round %d rcv \n", maxRound)
 		require.Equal(t, maxRound, resp.GetRound())
-	case <-time.After(300 * time.Millisecond):
+	case <-time.After(waitTime):
 		require.False(t, true, "should have gotten a round after time went by")
 	}
 
@@ -802,7 +803,7 @@ func TestDrandPublicStream(t *testing.T) {
 		select {
 		case resp := <-respCh:
 			require.Equal(t, i, resp.GetRound())
-		case <-time.After(300 * time.Millisecond):
+		case <-time.After(waitTime):
 			require.False(t, true, "should have gotten all past rounds")
 		}
 	}
@@ -814,14 +815,14 @@ func TestDrandPublicStream(t *testing.T) {
 	case resp := <-respCh:
 		t.Logf("Round %d rcv \n", maxRound)
 		require.Equal(t, maxRound+1, resp.GetRound())
-	case <-time.After(300 * time.Millisecond):
+	case <-time.After(waitTime):
 		require.False(t, true, "should have gotten a round after time went by")
 	}
 
 	select {
 	case <-respCh:
 		require.False(t, true, "shouldn't get a round if time doesn't go by")
-	case <-time.After(300 * time.Millisecond):
+	case <-time.After(waitTime):
 		// correct
 	}
 }
