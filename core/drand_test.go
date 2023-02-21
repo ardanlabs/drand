@@ -395,7 +395,7 @@ func TestRunDKGReshareTimeout(t *testing.T) {
 	dt.CheckBeaconLength(t, dt.nodes, 2)
 
 	// so nodes think they are going forward with round 2
-	dt.AdvanceMockClock(t, 1*time.Second)
+	dt.AdvanceMockClock(t, beaconPeriod)
 
 	// + offline makes sure t
 	nodesToKeep := oldNodes - offline
@@ -421,7 +421,7 @@ func TestRunDKGReshareTimeout(t *testing.T) {
 		dt.AdvanceMockClock(t, beaconPeriod)
 		time.Sleep(test.GetSleepDuration())
 		dt.CheckPublicBeacon(dt.Ids(1, false)[0], false)
-		if dt.clock.Now().Unix() >= resharedGroup.TransitionTime {
+		if dt.clock.Now().Unix() > resharedGroup.TransitionTime {
 			break
 		}
 	}
@@ -454,7 +454,7 @@ func TestRunDKGReshareTimeout(t *testing.T) {
 		resp2, err := client.PublicRand(ctx, n.drand.priv.Public, req)
 		if errors.Is(err, derrors.ErrNoBeaconStored) {
 			t.Logf("[reshare] ErrNoBeaconStored: retrying request for %s", n.addr)
-			time.Sleep(test.GetSleepDuration())
+			time.Sleep(beaconPeriod)
 			resp2, err = client.PublicRand(ctx, n.drand.priv.Public, req)
 		}
 		require.NoError(t, err)
