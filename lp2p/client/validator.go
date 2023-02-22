@@ -5,6 +5,7 @@ import (
 	"context"
 	"time"
 
+	clock "github.com/jonboulle/clockwork"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"google.golang.org/protobuf/proto"
@@ -15,7 +16,7 @@ import (
 	"github.com/drand/drand/protobuf/drand"
 )
 
-func randomnessValidator(info *chain.Info, cache client.Cache, c *Client) pubsub.ValidatorEx {
+func randomnessValidator(info *chain.Info, cache client.Cache, c *Client, clk clock.Clock) pubsub.ValidatorEx {
 	return func(ctx context.Context, p peer.ID, m *pubsub.Message) pubsub.ValidationResult {
 		rand := &drand.PublicRandResponse{}
 		err := proto.Unmarshal(m.Data, rand)
@@ -32,14 +33,14 @@ func randomnessValidator(info *chain.Info, cache client.Cache, c *Client) pubsub
 		}
 
 		// Unwilling to relay beacons in the future.
-		timeNow := time.Now()
+		timeNow := clk.Now()
 		timeOfRound := chain.TimeOfRound(info.Period, info.GenesisTime, rand.GetRound())
 		if time.Unix(timeOfRound, 0).After(timeNow) {
 			c.log.Warnw("",
 				"gossip validator", "Not validating received randomness due to time of round",
 				"err", err,
 				"timeOfRound", timeOfRound,
-				"time.Now", timeNow.Unix(),
+				"time.Now", timeNow.UnixMicro(),
 				"info.Period", info.Period,
 				"info.Genesis", info.GenesisTime,
 				"round", rand.GetRound(),

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	clock "github.com/jonboulle/clockwork"
 	json "github.com/nikkolasg/hexjson"
 	"github.com/stretchr/testify/require"
 
@@ -24,8 +25,8 @@ func withClient(t *testing.T) (c client.Client, emit func(bool)) {
 	t.Helper()
 	sch, err := crypto.GetSchemeFromEnv()
 	require.NoError(t, err)
-
-	l, s := mock.NewMockGRPCPublicServer(t, ":0", true, sch)
+	clk := clock.NewFakeClockAt(time.Now())
+	l, s := mock.NewMockGRPCPublicServer(t, ":0", true, sch, clk)
 	lAddr := l.Addr()
 	go l.Start()
 

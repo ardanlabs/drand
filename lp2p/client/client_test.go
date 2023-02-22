@@ -9,6 +9,7 @@ import (
 	"time"
 
 	bds "github.com/ipfs/go-ds-badger2"
+	clock "github.com/jonboulle/clockwork"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
@@ -31,7 +32,9 @@ func TestGRPCClientTestFunc(t *testing.T) {
 	sch, err := crypto.GetSchemeFromEnv()
 	require.NoError(t, err)
 
-	grpcLis, svc := mock.NewMockGRPCPublicServer(t, ":0", false, sch)
+	clk := clock.NewFakeClockAt(time.Now())
+
+	grpcLis, svc := mock.NewMockGRPCPublicServer(t, ":0", false, sch, clk)
 	grpcAddr := grpcLis.Addr()
 	go grpcLis.Start()
 	defer grpcLis.Stop(context.Background())
@@ -62,7 +65,7 @@ func TestGRPCClientTestFunc(t *testing.T) {
 	defer g.Shutdown()
 
 	// start client
-	c, err := newTestClient(t, g.Multiaddrs(), info)
+	c, err := newTestClient(t, g.Multiaddrs(), info, clk)
 	require.NoError(t, err)
 	defer func() {
 		err := c.Close()
@@ -119,7 +122,9 @@ func TestHTTPClientTestFunc(t *testing.T) {
 	sch, err := crypto.GetSchemeFromEnv()
 	require.NoError(t, err)
 
-	addr, chainInfo, stop, emit := httpmock.NewMockHTTPPublicServer(t, false, sch)
+	clk := clock.NewFakeClockAt(time.Now())
+
+	addr, chainInfo, stop, emit := httpmock.NewMockHTTPPublicServer(t, false, sch, clk)
 	defer stop()
 
 	dataDir := t.TempDir()
@@ -143,7 +148,7 @@ func TestHTTPClientTestFunc(t *testing.T) {
 	}
 	defer g.Shutdown()
 
-	c, err := newTestClient(t, g.Multiaddrs(), chainInfo)
+	c, err := newTestClient(t, g.Multiaddrs(), chainInfo, clk)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +177,7 @@ func TestHTTPClientTestFunc(t *testing.T) {
 	drain(t, ch, 5*time.Second)
 }
 
-func newTestClient(t *testing.T, relayMultiaddr []ma.Multiaddr, info *chain.Info) (*Client, error) {
+func newTestClient(t *testing.T, relayMultiaddr []ma.Multiaddr, info *chain.Info, clk clock.Clock) (*Client, error) {
 	dataDir := t.TempDir()
 	identityDir := t.TempDir()
 	ds, err := bds.NewDatastore(dataDir, nil)
@@ -201,7 +206,7 @@ func newTestClient(t *testing.T, relayMultiaddr []ma.Multiaddr, info *chain.Info
 	if err != nil {
 		return nil, err
 	}
-	c, err := NewWithPubsub(ps, info, nil)
+	c, err := NewWithPubsub(ps, info, nil, clk)
 	if err != nil {
 		return nil, err
 	}

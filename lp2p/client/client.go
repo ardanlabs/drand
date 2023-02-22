@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"sync"
 
+	clock "github.com/jonboulle/clockwork"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/proto"
@@ -36,9 +37,9 @@ func (c *Client) SetLog(l log.Logger) {
 
 // WithPubsub provides an option for integrating pubsub notification
 // into a drand client.
-func WithPubsub(ps *pubsub.PubSub) client.Option {
+func WithPubsub(ps *pubsub.PubSub, clk clock.Clock) client.Option {
 	return client.WithWatcher(func(info *chain.Info, cache client.Cache) (client.Watcher, error) {
-		c, err := NewWithPubsub(ps, info, cache)
+		c, err := NewWithPubsub(ps, info, cache, clk)
 		if err != nil {
 			return nil, err
 		}
@@ -49,7 +50,7 @@ func WithPubsub(ps *pubsub.PubSub) client.Option {
 // NewWithPubsub creates a gossip randomness client.
 //
 //nolint:funlen // THis is the correct function length
-func NewWithPubsub(ps *pubsub.PubSub, info *chain.Info, cache client.Cache) (*Client, error) {
+func NewWithPubsub(ps *pubsub.PubSub, info *chain.Info, cache client.Cache, clk clock.Clock) (*Client, error) {
 	if info == nil {
 		return nil, xerrors.Errorf("No chain supplied for joining")
 	}
@@ -63,7 +64,7 @@ func NewWithPubsub(ps *pubsub.PubSub, info *chain.Info, cache client.Cache) (*Cl
 
 	chainHash := hex.EncodeToString(info.Hash())
 	topic := lp2p.PubSubTopic(chainHash)
-	if err := ps.RegisterTopicValidator(topic, randomnessValidator(info, cache, c)); err != nil {
+	if err := ps.RegisterTopicValidator(topic, randomnessValidator(info, cache, c, clk)); err != nil {
 		cancel()
 		return nil, xerrors.Errorf("creating topic: %w", err)
 	}
