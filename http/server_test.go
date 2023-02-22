@@ -211,7 +211,7 @@ func TestHTTPWaiting(t *testing.T) {
 		t.Fatal("should return after a round")
 	}
 
-	t.Logf("comparing values: before: %s after: %s", before, after)
+	t.Logf("comparing values: before: %s after: %s\n", before, after)
 
 	// mock grpc server spits out new round every second on streaming interface.
 	if after.Sub(before) > time.Second || after.Sub(before) < 10*time.Millisecond {

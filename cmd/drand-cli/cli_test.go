@@ -507,7 +507,7 @@ func testStatus(t *testing.T, ctrlPort, beaconID string) {
 
 	var err error
 
-	t.Logf(" + running STATUS command with %s on beacon [%s]", ctrlPort, beaconID)
+	t.Logf(" + running STATUS command with %s on beacon [%s]\n", ctrlPort, beaconID)
 	for i := 0; i < 3; i++ {
 		status := []string{"drand", "util", "status", "--control", ctrlPort, "--id", beaconID}
 		err = CLI().Run(status)
@@ -524,7 +524,7 @@ func testFailStatus(t *testing.T, ctrlPort, beaconID string) {
 
 	var err error
 
-	t.Logf(" + running STATUS command with %s on beacon [%s]", ctrlPort, beaconID)
+	t.Logf(" + running STATUS command with %s on beacon [%s]\n", ctrlPort, beaconID)
 	for i := 0; i < 3; i++ {
 		status := []string{"drand", "util", "status", "--control", ctrlPort, "--id", beaconID}
 		err = CLI().Run(status)

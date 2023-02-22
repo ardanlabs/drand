@@ -45,10 +45,10 @@ func consumeProgress(t *testing.T, progress chan *drand.SyncProgress, errCh chan
 		defer func() {
 			for e := range errCh {
 				if errors.Is(e, io.EOF) { // means we've reached the end
-					t.Logf("\t\t --> Got EOF from daemon.")
+					t.Logf("\t\t --> Got EOF from daemon.\n")
 					return
 				}
-				t.Logf("\t\t --> Unexpected error received: %v.", e)
+				t.Logf("\t\t --> Unexpected error received: %v.\n", e)
 				require.NoError(t, e)
 			}
 		}()
@@ -57,7 +57,7 @@ func consumeProgress(t *testing.T, progress chan *drand.SyncProgress, errCh chan
 			select {
 			case p, ok := <-progress:
 				if ok && p.Current == amount {
-					t.Logf("\t\t --> Successful chain sync progress. Achieved round: %d.", amount)
+					t.Logf("\t\t --> Successful chain sync progress. Achieved round: %d.\n", amount)
 					return
 				}
 				if !ok {
@@ -76,10 +76,10 @@ func consumeProgress(t *testing.T, progress chan *drand.SyncProgress, errCh chan
 			require.Equal(t, amount, p.Target)
 		case e := <-errCh:
 			if errors.Is(e, io.EOF) {
-				t.Logf("\t\t --> Got EOF from daemon.")
+				t.Logf("\t\t --> Got EOF from daemon.\n")
 				return
 			}
-			t.Logf("\t\t -->Unexpected error received: %v.", e)
+			t.Logf("\t\t -->Unexpected error received: %v.\n", e)
 			require.NoError(t, e)
 		case <-time.After(2 * time.Second):
 			t.Fatalf("\t\t --> Timeout during test")
@@ -156,18 +156,18 @@ func TestDrandDKGFresh(t *testing.T) {
 	lastNode := dt.nodes[n-1]
 	restOfNodes := dt.nodes[:n-1]
 
-	t.Logf("Stop last node %s", lastNode.addr)
+	t.Logf("Stop last node %s\n", lastNode.addr)
 	dt.StopMockNode(lastNode.addr, false)
 
 	// move time to genesis
 	dt.SetMockClock(t, finalGroup.GenesisTime)
-	t.Logf("Time = %d", finalGroup.GenesisTime)
+	t.Logf("Time = %d\n", finalGroup.GenesisTime)
 
 	// two = genesis + 1st round (happens at genesis)
 	t.Log("Check Beacon Length")
 	dt.CheckBeaconLength(t, restOfNodes, 2)
 
-	t.Logf("Start last node %s", lastNode.addr)
+	t.Logf("Start last node %s\n", lastNode.addr)
 	dt.StartDrand(t, lastNode.addr, true, false)
 
 	// The catchup process will finish when node gets the previous beacons (1st round)
@@ -244,7 +244,7 @@ func TestRunDKGReshareForce(t *testing.T) {
 	dt.SetMockClock(t, group1.GenesisTime)
 
 	// wait to get first round
-	t.Logf("Getting round %d", 0)
+	t.Logf("Getting round %d\n", 0)
 	err = dt.WaitUntilRound(t, dt.nodes[0], 1)
 	require.NoError(t, err)
 
@@ -304,7 +304,7 @@ func TestRunDKGReshareForce(t *testing.T) {
 	require.NoError(t, err, "second resharing failed")
 
 	t.Log("[reshare] Move to response phase!")
-	t.Logf("[reshare] Group: %s", group3)
+	t.Logf("[reshare] Group: %s\n", group3)
 }
 
 // This tests when a node first signal his intention to participate into a
@@ -415,7 +415,7 @@ func TestRunDKGReshareTimeout(t *testing.T) {
 		})
 	require.NoError(t, err)
 	require.NotNil(t, resharedGroup)
-	t.Logf("[reshare] Group: %s", resharedGroup)
+	t.Logf("[reshare] Group: %s\n", resharedGroup)
 
 	for {
 		dt.AdvanceMockClock(t, beaconPeriod)
@@ -450,10 +450,10 @@ func TestRunDKGReshareTimeout(t *testing.T) {
 	for _, n := range dt.resharedNodes[1:] {
 		// Make sure we pull the same round from the rest of the nodes as we received from the leader
 		req := &drand.PublicRandRequest{Round: resp.Round}
-		t.Logf("[reshare] Requesting round %d to %s", resp.Round, n.addr)
+		t.Logf("[reshare] Requesting round %d to %s\n", resp.Round, n.addr)
 		resp2, err := client.PublicRand(ctx, n.drand.priv.Public, req)
 		if errors.Is(err, derrors.ErrNoBeaconStored) {
-			t.Logf("[reshare] ErrNoBeaconStored: retrying request for %s", n.addr)
+			t.Logf("[reshare] ErrNoBeaconStored: retrying request for %s\n", n.addr)
 			time.Sleep(beaconPeriod)
 			resp2, err = client.PublicRand(ctx, n.drand.priv.Public, req)
 		}
@@ -754,7 +754,7 @@ func TestDrandPublicStream(t *testing.T) {
 	// we expect the next one now
 	initRound := resp.Round + 1
 	maxRound := initRound + uint64(nTry)
-	t.Logf("Streaming for future rounds starting from %d until round %d", initRound, maxRound)
+	t.Logf("Streaming for future rounds starting from %d until round %d\n", initRound, maxRound)
 
 	for round := initRound; round < maxRound; round++ {
 		t.Logf("advancing clock for round %d\n", round)
@@ -771,7 +771,7 @@ func TestDrandPublicStream(t *testing.T) {
 	}
 
 	// try fetching with round 0 -> get latest
-	t.Logf("Streaming for rounds starting from %d to %d", 0, maxRound)
+	t.Logf("Streaming for rounds starting from %d to %d\n", 0, maxRound)
 
 	respCh, err = client.PublicRandStream(ctx, root.drand.priv.Public, new(drand.PublicRandRequest))
 	require.NoError(t, err)
@@ -792,7 +792,7 @@ func TestDrandPublicStream(t *testing.T) {
 		require.False(t, true, "should have gotten a round after time went by")
 	}
 
-	t.Logf("Streaming for past rounds starting from %d until %d", 1, maxRound+2)
+	t.Logf("Streaming for past rounds starting from %d until %d\n", 1, maxRound+2)
 
 	respCh, err = client.PublicRandStream(ctx, root.drand.priv.Public, &drand.PublicRandRequest{
 		Round: 1,
@@ -834,7 +834,7 @@ func expectChanFail(t *testing.T, errCh chan error) {
 		if errors.Is(e, io.EOF) {
 			t.Fatal("should have errored but got EOF")
 		}
-		t.Logf("An error was received as expected: %v", e)
+		t.Logf("An error was received as expected: %v\n", e)
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("An error should have been received.")
 	}
@@ -909,7 +909,7 @@ func TestDrandFollowChain(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 
 		t.Logf(" \t [-] Starting to follow chain with a valid hash. %d <= %d \n", upTo, exp)
-		t.Logf(" \t\t --> beaconID: %s ; hash-chain: %s", beaconID, hash)
+		t.Logf(" \t\t --> beaconID: %s ; hash-chain: %s\n", beaconID, hash)
 		progress, errCh, err := newClient.StartFollowChain(ctx, hash, addrToFollow, tls, upTo, beaconID)
 		require.NoError(t, err)
 
@@ -918,16 +918,16 @@ func TestDrandFollowChain(t *testing.T) {
 			case p, ok := <-progress:
 				t.Logf(" \t\t --> Received progress: %d / %d \n", p.Current, p.Target)
 				if ok && p.Current == exp {
-					t.Logf("\t\t -->Successful beacon rcv. Round: %d.", exp)
+					t.Logf("\t\t -->Successful beacon rcv. Round: %d.\n", exp)
 					goon = false
 				}
 			case e := <-errCh:
 				if errors.Is(e, io.EOF) { // means we've reached the end
-					t.Logf("\t\t -->Got EOF from daemon.")
+					t.Logf("\t\t -->Got EOF from daemon.\n")
 					goon = false
 					break
 				}
-				t.Logf("\t\t -->Unexpected error received: %v.", e)
+				t.Logf("\t\t -->Unexpected error received: %v.\n", e)
 				require.NoError(t, e)
 			case <-time.After(2 * time.Second):
 				t.Fatalf("\t\t --> Timeout during test")
@@ -1011,7 +1011,7 @@ func TestDrandCheckChain(t *testing.T) {
 	tls := true
 
 	// First try with an invalid hash info
-	t.Logf("Trying to resync with an invalid address\n")
+	t.Log("Trying to resync with an invalid address")
 
 	_, errCh, _ := ctrlClient.StartCheckChain(context.Background(), "deadbeef", nil, tls, 10000, beaconID)
 	expectChanFail(t, errCh)
@@ -1023,8 +1023,8 @@ func TestDrandCheckChain(t *testing.T) {
 	addrToFollow := []string{rootID.Address()}
 	upTo := uint64(5)
 
-	t.Logf(" \t [-] Starting resync chain with a valid hash.")
-	t.Logf(" \t\t --> beaconID: %s ; hash-chain: %s", beaconID, hash)
+	t.Logf(" \t [-] Starting resync chain with a valid hash.\n")
+	t.Logf(" \t\t --> beaconID: %s ; hash-chain: %s\n", beaconID, hash)
 	progress, errCh, err := ctrlClient.StartCheckChain(ctx, hash, addrToFollow, tls, upTo, beaconID)
 	require.NoError(t, err)
 	consumeProgress(t, progress, errCh, upTo, true)
@@ -1146,7 +1146,7 @@ func TestDrandPublicStreamProxy(t *testing.T) {
 	defer cancel()
 
 	// get last round first
-	t.Logf("Getting round %d", 0)
+	t.Logf("Getting round %d\n", 0)
 	resp, err := client.Get(ctx, 0)
 	require.NoError(t, err)
 
@@ -1161,7 +1161,7 @@ func TestDrandPublicStreamProxy(t *testing.T) {
 		panic("expected beacon")
 	}
 
-	t.Logf("Round received %d", beacon.Round())
+	t.Logf("Round received %d\n", beacon.Round())
 	require.Equal(t, beacon.Round(), resp.Round()+1)
 
 	nTry := 4
@@ -1178,7 +1178,7 @@ func TestDrandPublicStreamProxy(t *testing.T) {
 
 		require.True(t, ok)
 
-		t.Logf("Round received %d", beacon.Round())
+		t.Logf("Round received %d\n", beacon.Round())
 		require.Equal(t, round, beacon.Round())
 	}
 }
