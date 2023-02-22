@@ -77,7 +77,7 @@ func TestGRPCClientTestFunc(t *testing.T) {
 
 	mockService := svc.(mock.MockService)
 	// pub sub polls every 200ms
-	wait := 1 * time.Second
+	wait := 250 * time.Millisecond
 	for i := uint64(0); i < 3; i++ {
 		time.Sleep(wait)
 		mockService.EmitRand(false)
