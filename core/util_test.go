@@ -860,7 +860,6 @@ func (d *DrandTestScenario) RunReshare(t *testing.T, c *reshareConfig) (*key.Gro
 		}
 	}
 
-
 	d.t.Log("[reshare] stopping excluded nodes")
 	// stop the excluded nodes
 	for i, node := range d.nodes[c.oldRun:] {
