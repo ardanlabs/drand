@@ -34,7 +34,7 @@ func TestGRPCClientTestFunc(t *testing.T) {
 
 	clk := clock.NewFakeClockAt(time.Now())
 
-	grpcLis, svc := mock.NewMockGRPCPublicServer(t, ":0", false, sch, clk)
+	grpcLis, svc := mock.NewMockGRPCPublicServer(t, "127.0.0.1:0", false, sch, clk)
 	grpcAddr := grpcLis.Addr()
 	go grpcLis.Start()
 	defer grpcLis.Stop(context.Background())
@@ -55,7 +55,7 @@ func TestGRPCClientTestFunc(t *testing.T) {
 	cfg := &lp2p.GossipRelayConfig{
 		ChainHash:    info.HashString(),
 		PeerWith:     nil,
-		Addr:         "/ip4/0.0.0.0/tcp/" + test.FreePort(),
+		Addr:         "/ip4/127.0.0.1/tcp/" + test.FreePort(),
 		DataDir:      dataDir,
 		IdentityPath: path.Join(identityDir, "identity.key"),
 		Client:       grpcClient,
