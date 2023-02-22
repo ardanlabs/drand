@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 
 	"github.com/drand/drand/chain"
@@ -98,7 +99,7 @@ func TestRunDKG(t *testing.T) {
 	expectedBeaconPeriod := 5 * time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, n, key.DefaultThreshold(n), expectedBeaconPeriod, beaconID)
+	dt := NewDrandTestScenario(t, n, key.DefaultThreshold(n), expectedBeaconPeriod, beaconID, clockwork.NewFakeClock())
 
 	group, err := dt.RunDKG()
 	require.NoError(t, err)
@@ -124,7 +125,7 @@ func TestRunDKGLarge(t *testing.T) {
 	expectedBeaconPeriod := 5 * time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, n, key.DefaultThreshold(n), expectedBeaconPeriod, beaconID)
+	dt := NewDrandTestScenario(t, n, key.DefaultThreshold(n), expectedBeaconPeriod, beaconID, clockwork.NewFakeClock())
 
 	group, err := dt.RunDKG()
 	require.NoError(t, err)
@@ -146,7 +147,7 @@ func TestDrandDKGFresh(t *testing.T) {
 	beaconPeriod := 1 * time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, n, key.DefaultThreshold(n), beaconPeriod, beaconID)
+	dt := NewDrandTestScenario(t, n, key.DefaultThreshold(n), beaconPeriod, beaconID, clockwork.NewFakeClockAt(time.Now()))
 
 	// Run DKG
 	finalGroup, err := dt.RunDKG()
@@ -196,7 +197,7 @@ func TestRunDKGBroadcastDeny(t *testing.T) {
 	beaconPeriod := 1 * time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, n, thr, beaconPeriod, beaconID)
+	dt := NewDrandTestScenario(t, n, thr, beaconPeriod, beaconID, clockwork.NewFakeClockAt(time.Now()))
 
 	// close connection between a pair of nodes
 	node1 := dt.nodes[1]
@@ -236,7 +237,7 @@ func TestRunDKGReshareForce(t *testing.T) {
 	beaconPeriod := 2 * time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, oldNodes, oldThreshold, beaconPeriod, beaconID)
+	dt := NewDrandTestScenario(t, oldNodes, oldThreshold, beaconPeriod, beaconID, clockwork.NewFakeClockAt(time.Now()))
 
 	group1, err := dt.RunDKG()
 	require.NoError(t, err)
@@ -315,7 +316,7 @@ func TestRunDKGReshareAbsentNode(t *testing.T) {
 	timeout, beaconPeriod := 1*time.Second, 2*time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, oldNodes, oldThreshold, beaconPeriod, beaconID)
+	dt := NewDrandTestScenario(t, oldNodes, oldThreshold, beaconPeriod, beaconID, clockwork.NewFakeClockAt(time.Now()))
 
 	group1, err := dt.RunDKG()
 	require.NoError(t, err)
@@ -378,7 +379,7 @@ func TestRunDKGReshareTimeout(t *testing.T) {
 	offline := 1
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, oldNodes, oldThreshold, beaconPeriod, beaconID)
+	dt := NewDrandTestScenario(t, oldNodes, oldThreshold, beaconPeriod, beaconID, clockwork.NewFakeClockAt(time.Now()))
 
 	group1, err := dt.RunDKG()
 	require.NoError(t, err)
@@ -473,7 +474,7 @@ func TestRunDKGResharePreempt(t *testing.T) {
 	beaconPeriod := 2 * time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, oldN, Thr, beaconPeriod, beaconID)
+	dt := NewDrandTestScenario(t, oldN, Thr, beaconPeriod, beaconID, clockwork.NewFakeClockAt(time.Now()))
 
 	group1, err := dt.RunDKG()
 	require.NoError(t, err)
@@ -574,7 +575,7 @@ func TestDrandPublicChainInfo(t *testing.T) {
 	p := 1 * time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, n, thr, p, beaconID)
+	dt := NewDrandTestScenario(t, n, thr, p, beaconID, clockwork.NewFakeClockAt(time.Now()))
 
 	group, err := dt.RunDKG()
 	require.NoError(t, err)
@@ -630,7 +631,7 @@ func TestDrandPublicRand(t *testing.T) {
 	p := 1 * time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, n, thr, p, beaconID)
+	dt := NewDrandTestScenario(t, n, thr, p, beaconID, clockwork.NewFakeClockAt(time.Now()))
 
 	group, err := dt.RunDKG()
 	require.NoError(t, err)
@@ -698,7 +699,7 @@ func TestDrandPublicStream(t *testing.T) {
 	p := 1 * time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, n, thr, p, beaconID)
+	dt := NewDrandTestScenario(t, n, thr, p, beaconID, clockwork.NewFakeClockAt(time.Now()))
 
 	group, err := dt.RunDKG()
 	require.NoError(t, err)
@@ -847,7 +848,7 @@ func TestDrandFollowChain(t *testing.T) {
 	n, p := 4, 1*time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, n, key.DefaultThreshold(n), p, beaconID)
+	dt := NewDrandTestScenario(t, n, key.DefaultThreshold(n), p, beaconID, clockwork.NewFakeClockAt(time.Now()))
 
 	group, err := dt.RunDKG()
 	require.NoError(t, err)
@@ -976,7 +977,7 @@ func TestDrandCheckChain(t *testing.T) {
 	n, p := 4, 1*time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, n, key.DefaultThreshold(n), p, beaconID)
+	dt := NewDrandTestScenario(t, n, key.DefaultThreshold(n), p, beaconID, clockwork.NewFakeClockAt(time.Now()))
 
 	group, err := dt.RunDKG()
 	require.NoError(t, err)
@@ -1119,7 +1120,7 @@ func TestDrandPublicStreamProxy(t *testing.T) {
 	p := 1 * time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, n, thr, p, beaconID)
+	dt := NewDrandTestScenario(t, n, thr, p, beaconID, clockwork.NewFakeClockAt(time.Now()))
 
 	group, err := dt.RunDKG()
 	require.NoError(t, err)
@@ -1189,7 +1190,7 @@ func TestReshareWithInvalidBeaconIdInMetadataFailsButNoSegfault(t *testing.T) {
 	p := 1 * time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, n, thr, p, beaconID)
+	dt := NewDrandTestScenario(t, n, thr, p, beaconID, clockwork.NewFakeClockAt(time.Now()))
 	_, err := dt.RunDKG()
 	require.NoError(t, err)
 
@@ -1230,7 +1231,7 @@ func TestReshareWithoutOldGroupFailsButNoSegfault(t *testing.T) {
 	p := 1 * time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, n, thr, p, beaconID)
+	dt := NewDrandTestScenario(t, n, thr, p, beaconID, clockwork.NewFakeClockAt(time.Now()))
 	_, err := dt.RunDKG()
 	require.NoError(t, err)
 
@@ -1261,7 +1262,7 @@ func TestModifyingGroupFileManuallyDoesNotSegfault(t *testing.T) {
 	p := 1 * time.Second
 	beaconID := test.GetBeaconIDFromEnv()
 
-	dt := NewDrandTestScenario(t, n, thr, p, beaconID)
+	dt := NewDrandTestScenario(t, n, thr, p, beaconID, clockwork.NewFakeClockAt(time.Now()))
 
 	node := dt.nodes[0]
 	dir := dt.dir
@@ -1305,7 +1306,7 @@ func TestModifyingGroupFileManuallyDoesNotSegfault(t *testing.T) {
 func TestDKGWithMismatchedSchemes(t *testing.T) {
 	t.Setenv("DRAND_TEST_LOGS", "DEBUG")
 	beaconID := "blah"
-	scenario := NewDrandTestScenario(t, 2, 2, 1*time.Second, beaconID)
+	scenario := NewDrandTestScenario(t, 2, 2, 1*time.Second, beaconID, clockwork.NewFakeClockAt(time.Now()))
 
 	// to dedupe it when we're running the tests with different default schemes
 	if os.Getenv("SCHEME_ID") == crypto.ShortSigSchemeID {

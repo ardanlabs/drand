@@ -195,7 +195,7 @@ func CloseAllDrands(drands []*BeaconProcess) {
 // NewDrandTest creates a drand test scenario with initial n nodes and ready to
 // run a DKG for the given threshold that will then launch the beacon with the
 // specified period
-func NewDrandTestScenario(t *testing.T, n, thr int, period time.Duration, beaconID string) *DrandTestScenario {
+func NewDrandTestScenario(t *testing.T, n, thr int, period time.Duration, beaconID string, clk clock.FakeClock) *DrandTestScenario {
 	sch, err := crypto.GetSchemeFromEnv()
 	if err != nil {
 		panic(err)
@@ -215,7 +215,7 @@ func NewDrandTestScenario(t *testing.T, n, thr int, period time.Duration, beacon
 	dt.beaconID = beaconID
 	dt.thr = thr
 	dt.period = period
-	dt.clock = clock.NewFakeClockAt(time.Now())
+	dt.clock = clk
 	dt.nodes = make([]*MockNode, 0, n)
 
 	for i, drandInstance := range drands {

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 
 	"github.com/drand/drand/chain"
@@ -113,7 +114,7 @@ func TestMemDBBeaconJoinsNetworkAtStart(t *testing.T) {
 	const period = 1 * time.Second
 	beaconName := t.Name()
 
-	ts := NewDrandTestScenario(t, existingNodesCount, thr, period, beaconName)
+	ts := NewDrandTestScenario(t, existingNodesCount, thr, period, beaconName, clockwork.NewFakeClockAt(time.Now()))
 
 	// We want to explicitly run a node with the chain.MemDB backend
 	newNodes := ts.AddNodesWithOptions(t, 1, beaconName, WithDBStorageEngine(chain.MemDB))
@@ -140,7 +141,7 @@ func TestMemDBBeaconJoinsNetworkAfterDKG(t *testing.T) {
 	beaconName := "default"
 	sleepDuration := test.GetSleepDuration()
 
-	ts := NewDrandTestScenario(t, existingNodesCount, thr, period, beaconName)
+	ts := NewDrandTestScenario(t, existingNodesCount, thr, period, beaconName, clockwork.NewFakeClockAt(time.Now()))
 	group, err := ts.RunDKG()
 	require.NoError(t, err)
 
