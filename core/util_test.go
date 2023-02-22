@@ -215,7 +215,7 @@ func NewDrandTestScenario(t *testing.T, n, thr int, period time.Duration, beacon
 	dt.beaconID = beaconID
 	dt.thr = thr
 	dt.period = period
-	dt.clock = clock.NewFakeClock()
+	dt.clock = clock.NewFakeClockAt(time.Now())
 	dt.nodes = make([]*MockNode, 0, n)
 
 	for i, drandInstance := range drands {
