@@ -44,6 +44,9 @@ func main() {
 		defer func() { fmt.Println("[+] Leaving test - all good") }()
 	}
 
+	err := os.Setenv("DRAND_TEST_LOGS", "")
+	checkErr(err)
+
 	if chain.StorageType(*dbEngineType) == chain.PostgreSQL {
 		stopContainer := cfg.BootContainer()
 		defer stopContainer()
