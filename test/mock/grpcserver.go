@@ -148,7 +148,7 @@ func (s *Server) EmitRand(closeStream bool) {
 		s.t.Log("MOCK SERVER: public rand err:", err)
 		return
 	}
-	s.t.Log(fmt.Sprintf("MOCK SERVER: sending round: %d time.Now: %d\n", resp.Round, s.clk.Now().UnixMicro()))
+	s.t.Log(fmt.Sprintf("MOCK SERVER: sending round: %d time.Now: %d\n", resp.Round, s.clk.Now().Unix()))
 	if err = stream.Send(resp); err != nil {
 		done <- err
 		s.t.Log("MOCK SERVER: stream send error:", err)

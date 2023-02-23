@@ -165,7 +165,7 @@ func (g *GossipRelayNode) background(w client.Watcher) {
 				g.l.Debugw("publishing message",
 					"relay_node", "publish",
 					"round", res.Round(),
-					"time.Now", time.Now().UnixMicro(),
+					"time.Now", time.Now().Unix(),
 				)
 
 				err = g.t.Publish(ctx, randB)

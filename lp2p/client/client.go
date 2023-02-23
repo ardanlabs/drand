@@ -197,7 +197,7 @@ func (c *Client) Watch(ctx context.Context) <-chan client.Result {
 				case outerCh <- dat:
 					c.log.Debugw("processed random beacon", "round", dat.Round())
 				default:
-					c.log.Warnw("", "gossip client", "randomness notification dropped due to a full channel")
+					c.log.Warnw("", "gossip client", "randomness notification dropped due to a full channel", "round", dat.Round())
 				}
 			case <-ctx.Done():
 				c.log.Debugw("client.Watch done")

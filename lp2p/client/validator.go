@@ -40,7 +40,7 @@ func randomnessValidator(info *chain.Info, cache client.Cache, c *Client, clk cl
 				"gossip validator", "Not validating received randomness due to time of round",
 				"err", err,
 				"timeOfRound", timeOfRound,
-				"time.Now", timeNow.UnixMicro(),
+				"time.Now", timeNow.Unix(),
 				"info.Period", info.Period,
 				"info.Genesis", info.GenesisTime,
 				"round", rand.GetRound(),
