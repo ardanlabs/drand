@@ -61,9 +61,9 @@ func (a *appendStore) Put(ctx context.Context, b *chain.Beacon) error {
 			if bytes.Equal(a.last.PreviousSig, b.PreviousSig) {
 				return fmt.Errorf("%w round %d", ErrBeaconAlreadyStored, b.Round)
 			}
-			return fmt.Errorf("tried to store a duplicate beacon for round %d but the previous signature was different", b.Round)
+			return fmt.Errorf("tried to store a duplicate beacon for round %d but the previous signature %#v was different %#v", b.Round, a.last.PreviousSig, b.PreviousSig)
 		}
-		return fmt.Errorf("tried to store a duplicate beacon for round %d but the signature was different", b.Round)
+		return fmt.Errorf("tried to store a duplicate beacon for round %d but the signature %#v was different %#v", b.Round, a.last.Signature, b.Signature)
 	}
 
 	if b.Round != a.last.Round+1 {

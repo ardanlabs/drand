@@ -118,7 +118,6 @@ func drain(t *testing.T, ch <-chan client.Result, timeout time.Duration) {
 }
 
 func TestHTTPClientTestFunc(t *testing.T) {
-	t.Skip("TestHTTPClientTestFunc is flaky")
 	sch, err := crypto.GetSchemeFromEnv()
 	require.NoError(t, err)
 
@@ -137,7 +136,7 @@ func TestHTTPClientTestFunc(t *testing.T) {
 	cfg := &lp2p.GossipRelayConfig{
 		ChainHash:    chainInfo.HashString(),
 		PeerWith:     nil,
-		Addr:         "/ip4/0.0.0.0/tcp/" + test.FreePort(),
+		Addr:         "/ip4/127.0.0.1/tcp/" + test.FreePort(),
 		DataDir:      dataDir,
 		IdentityPath: path.Join(identityDir, "identity.key"),
 		Client:       httpClient,
