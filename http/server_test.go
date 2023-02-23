@@ -30,7 +30,8 @@ func withClient(t *testing.T) (c client.Client, emit func(bool)) {
 	lAddr := l.Addr()
 	go l.Start()
 
-	c, _ = grpc.New(lAddr, "", true, []byte(""))
+	c, err = grpc.New(lAddr, "", true, []byte(""))
+	require.NoError(t, err)
 
 	return c, s.(mock.MockService).EmitRand
 }
