@@ -36,16 +36,18 @@ type appendStore struct {
 	chain.Store
 	last *chain.Beacon
 	sync.Mutex
+	isChained bool
 }
 
-func newAppendStore(s chain.Store) (chain.Store, error) {
+func newAppendStore(s chain.Store, sch *crypto.Scheme) (chain.Store, error) {
 	last, err := s.Last(context.Background())
 	if err != nil {
 		return nil, err
 	}
 	return &appendStore{
-		Store: s,
-		last:  last,
+		Store:     s,
+		last:      last,
+		isChained: sch.Name == crypto.DefaultSchemeID,
 	}, nil
 }
 
@@ -58,9 +60,14 @@ func (a *appendStore) Put(ctx context.Context, b *chain.Beacon) error {
 
 	if b.Round == a.last.Round {
 		if bytes.Equal(a.last.Signature, b.Signature) {
+			if !a.isChained {
+				return fmt.Errorf("%w round %d", ErrBeaconAlreadyStored, b.Round)
+			}
+
 			if bytes.Equal(a.last.PreviousSig, b.PreviousSig) {
 				return fmt.Errorf("%w round %d", ErrBeaconAlreadyStored, b.Round)
 			}
+
 			return fmt.Errorf(
 				"tried to store a duplicate beacon for round %d but the previous signature %#v was different %#v",
 				b.Round, a.last.PreviousSig, b.PreviousSig)
@@ -83,8 +90,9 @@ func (a *appendStore) Put(ctx context.Context, b *chain.Beacon) error {
 // schemeStore is a store that run different checks depending on what scheme is being used.
 type schemeStore struct {
 	chain.Store
-	sch  *crypto.Scheme
-	last *chain.Beacon
+	sch       *crypto.Scheme
+	last      *chain.Beacon
+	isChained bool
 	sync.Mutex
 }
 
@@ -94,9 +102,10 @@ func NewSchemeStore(s chain.Store, sch *crypto.Scheme) (chain.Store, error) {
 		return nil, err
 	}
 	return &schemeStore{
-		Store: s,
-		last:  last,
-		sch:   sch,
+		Store:     s,
+		last:      last,
+		sch:       sch,
+		isChained: sch.Name == crypto.DefaultSchemeID,
 	}, nil
 }
 
@@ -107,15 +116,16 @@ func (a *schemeStore) Put(ctx context.Context, b *chain.Beacon) error {
 	// If the scheme is unchained, previous signature is set to nil. In that case,
 	// relationship between signature in the previous beacon and previous signature
 	// on the actual beacon is not necessary. Otherwise, it will be checked.
-	switch a.sch.Name {
-	case crypto.DefaultSchemeID: // in chained mode it should keep the consistency between prev signature and signature
+	if a.isChained {
+		// in chained mode it should keep the consistency between prev signature and signature
 		if !bytes.Equal(a.last.Signature, b.PreviousSig) {
 			return fmt.Errorf("invalid previous signature for %d: %x != %x",
 				b.Round,
 				a.last.Signature,
 				b.PreviousSig)
 		}
-	default: // we're in unchained mode, we don't need the previous signature
+	} else {
+		// we're in unchained mode, we don't need the previous signature
 		b.PreviousSig = nil
 	}
 

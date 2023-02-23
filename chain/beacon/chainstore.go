@@ -51,7 +51,7 @@ func newChainStore(l log.Logger, cf *Config, cl net.ProtocolClient, v *vault.Vau
 	}
 
 	// we make sure the chain is increasing monotonically
-	as, err := newAppendStore(ss)
+	as, err := newAppendStore(ss, cf.Group.Scheme)
 	if err != nil {
 		return nil, err
 	}
