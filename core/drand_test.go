@@ -942,7 +942,8 @@ func TestDrandFollowChain(t *testing.T) {
 
 		// (Postgres) Database operations need to have a proper context to work.
 		// We create a new one, since we canceled the previous one.
-		ctx = context.Background()
+		ctx, cancel = context.WithCancel(context.Background())
+		defer cancel()
 
 		// check if the beacon is in the database
 		store := newNode.drand.dbStore
@@ -959,6 +960,7 @@ func TestDrandFollowChain(t *testing.T) {
 	}
 
 	fn(resp.GetRound()-2, resp.GetRound()-2)
+	time.Sleep(test.GetSleepDuration())
 	fn(0, resp.GetRound())
 }
 
