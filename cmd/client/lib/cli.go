@@ -14,7 +14,6 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/google/uuid"
 	bds "github.com/ipfs/go-ds-badger2"
-	clock "github.com/jonboulle/clockwork"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
@@ -253,7 +252,7 @@ func buildGossipClient(c *cli.Context) ([]client.Option, error) {
 			if err != nil {
 				return nil, err
 			}
-			return []client.Option{gclient.WithPubsub(ps, clock.NewRealClock())}, nil
+			return []client.Option{gclient.WithPubsub(ps)}, nil
 		}
 	}
 	return []client.Option{}, nil
