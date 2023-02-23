@@ -163,7 +163,7 @@ func TestHTTPWaiting(t *testing.T) {
 
 	handler.RegisterNewBeaconHandler(c, info.HashString())
 
-	listener, err := net.Listen("tcp", ":0")
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	server := http.Server{Handler: handler.GetHTTPHandler()}
@@ -183,7 +183,7 @@ func TestHTTPWaiting(t *testing.T) {
 
 	// Wait a bit after we send this request since DrandHandler.getRand() might not contain
 	// the expected beacon from above due to lock contention on bh.pendingLk.
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	done := make(chan time.Time)
 	before := time.Now()
@@ -202,7 +202,7 @@ func TestHTTPWaiting(t *testing.T) {
 	default:
 	}
 	push(false)
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	var after time.Time
 	select {
 	case x := <-done:
