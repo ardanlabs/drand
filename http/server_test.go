@@ -289,7 +289,7 @@ func TestHTTPHealth(t *testing.T) {
 	resp.Body.Close()
 
 	resp = getWithCtx(ctx, fmt.Sprintf("http://%s/%s/public/0", listener.Addr().String(), info.HashString()), t)
-	require.Equal(t, http.StatusOK, resp.StatusCode,"startup of the server on 1st request should happen")
+	require.Equal(t, http.StatusOK, resp.StatusCode, "startup of the server on 1st request should happen")
 
 	push(false)
 	// give some time for http server to get it
@@ -299,6 +299,6 @@ func TestHTTPHealth(t *testing.T) {
 	resp = getWithCtx(ctx, fmt.Sprintf("http://%s/%s/health", listener.Addr().String(), info.HashString()), t)
 	var buf [100]byte
 	_, _ = resp.Body.Read(buf[:])
-	require.Equalf(t, http.StatusOK, resp.StatusCode,"after start server expected to be healthy relatively quickly. %v - %v", string(buf[:]), resp.StatusCode)
+	require.Equalf(t, http.StatusOK, resp.StatusCode, "after start server expected to be healthy relatively quickly. %v - %v", string(buf[:]), resp.StatusCode)
 	resp.Body.Close()
 }
