@@ -845,7 +845,6 @@ func (d *DrandTestScenario) RunReshare(t *testing.T, c *reshareConfig) (*key.Gro
 		}
 	}
 
-	d.t.Log("[reshare] unlocking")
 	d.Unlock()
 	d.t.Log("[reshare] unlocked")
 
