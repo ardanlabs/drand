@@ -293,7 +293,7 @@ func TestHTTPHealth(t *testing.T) {
 
 	push(false)
 	// give some time for http server to get it
-	time.Sleep(30 * time.Millisecond)
+	time.Sleep(test.GetSleepDuration())
 	resp.Body.Close()
 
 	resp = getWithCtx(ctx, fmt.Sprintf("http://%s/%s/health", listener.Addr().String(), info.HashString()), t)
