@@ -266,50 +266,39 @@ func TestHTTPHealth(t *testing.T) {
 	c, push := withClient(t, clk)
 
 	handler, err := New(ctx, "", test.Logger(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	info, err := c.Info(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	handler.RegisterNewBeaconHandler(c, info.HashString())
 
 	listener, err := net.Listen("tcp", ":0")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	server := http.Server{Handler: handler.GetHTTPHandler()}
 	go func() { _ = server.Serve(listener) }()
 	defer func() { _ = server.Shutdown(ctx) }()
 
 	err = nhttp.IsServerReady(listener.Addr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	resp := getWithCtx(ctx, fmt.Sprintf("http://%s/%s/health", listener.Addr().String(), info.HashString()), t)
-	if resp.StatusCode == http.StatusOK {
-		t.Fatalf("newly started server not expected to be synced.")
-	}
+	require.NotEqual(t, http.StatusOK, resp.StatusCode, "newly started server not expected to be synced.")
+
 	resp.Body.Close()
 
 	resp = getWithCtx(ctx, fmt.Sprintf("http://%s/%s/public/0", listener.Addr().String(), info.HashString()), t)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("startup of the server on 1st request should happen")
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode,"startup of the server on 1st request should happen")
+
 	push(false)
 	// give some time for http server to get it
 	time.Sleep(30 * time.Millisecond)
 	resp.Body.Close()
 
 	resp = getWithCtx(ctx, fmt.Sprintf("http://%s/%s/health", listener.Addr().String(), info.HashString()), t)
-	if resp.StatusCode != http.StatusOK {
-		var buf [100]byte
-		_, _ = resp.Body.Read(buf[:])
-		t.Fatalf("after start server expected to be healthy relatively quickly. %v - %v", string(buf[:]), resp.StatusCode)
-	}
+	var buf [100]byte
+	_, _ = resp.Body.Read(buf[:])
+	require.Equalf(t, http.StatusOK, resp.StatusCode,"after start server expected to be healthy relatively quickly. %v - %v", string(buf[:]), resp.StatusCode)
 	resp.Body.Close()
 }
