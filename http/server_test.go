@@ -204,7 +204,7 @@ func TestHTTPWaiting(t *testing.T) {
 	default:
 	}
 	push(false)
-	// time.Sleep(100 * time.Millisecond)
+
 	var after time.Time
 	select {
 	case x := <-done:
