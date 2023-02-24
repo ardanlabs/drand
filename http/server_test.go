@@ -21,12 +21,11 @@ import (
 	"github.com/drand/drand/test/mock"
 )
 
-func withClient(t *testing.T) (c client.Client, emit func(bool)) {
+func withClient(t *testing.T, clk clock.Clock) (c client.Client, emit func(bool)) {
 	t.Helper()
 	sch, err := crypto.GetSchemeFromEnv()
 	require.NoError(t, err)
-	clk := clock.NewFakeClockAt(time.Now())
-	l, s := mock.NewMockGRPCPublicServer(t, ":0", true, sch, clk)
+	l, s := mock.NewMockGRPCPublicServer(t, "127.0.0.1:0", true, sch, clk)
 	lAddr := l.Addr()
 	go l.Start()
 
@@ -50,7 +49,8 @@ func TestHTTPRelay(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	c, _ := withClient(t)
+	clk := clock.NewFakeClockAt(time.Now())
+	c, _ := withClient(t, clk)
 
 	handler, err := New(ctx, "", test.Logger(t))
 	if err != nil {
@@ -153,7 +153,9 @@ func validateEndpoint(endpoint string, round float64) error {
 func TestHTTPWaiting(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	c, push := withClient(t)
+
+	clk := clock.NewFakeClockAt(time.Now())
+	c, push := withClient(t, clk)
 
 	handler, err := New(ctx, "", test.Logger(t))
 	require.NoError(t, err)
@@ -176,24 +178,24 @@ func TestHTTPWaiting(t *testing.T) {
 	// The first request will trigger background watch. 1 get (1969)
 	u := fmt.Sprintf("http://%s/%s/public/1", listener.Addr().String(), info.HashString())
 	next := getWithCtx(ctx, u, t)
-	defer func() { _ = next.Body.Close() }()
+	_ = next.Body.Close()
 
 	// 1 watch get will occur (1970 - the bad one)
 	push(false)
 
 	// Wait a bit after we send this request since DrandHandler.getRand() might not contain
 	// the expected beacon from above due to lock contention on bh.pendingLk.
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(test.GetSleepDuration())
 
 	done := make(chan time.Time)
-	before := time.Now()
+	before := clk.Now()
 	go func() {
 		endpoint := listener.Addr().String() + "/" + info.HashString() + "/public/1971"
 		if err = validateEndpoint(endpoint, 1971.0); err != nil {
 			done <- time.Unix(0, 0)
 			return
 		}
-		done <- time.Now()
+		done <- clk.Now()
 	}()
 	time.Sleep(100 * time.Millisecond)
 	select {
@@ -202,7 +204,7 @@ func TestHTTPWaiting(t *testing.T) {
 	default:
 	}
 	push(false)
-	time.Sleep(100 * time.Millisecond)
+	// time.Sleep(100 * time.Millisecond)
 	var after time.Time
 	select {
 	case x := <-done:
@@ -223,7 +225,8 @@ func TestHTTPWaiting(t *testing.T) {
 func TestHTTPWatchFuture(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	c, _ := withClient(t)
+	clk := clock.NewFakeClockAt(time.Now())
+	c, _ := withClient(t, clk)
 
 	handler, err := New(ctx, "", test.Logger(t))
 	if err != nil {
@@ -259,7 +262,8 @@ func TestHTTPWatchFuture(t *testing.T) {
 func TestHTTPHealth(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	c, push := withClient(t)
+	clk := clock.NewFakeClockAt(time.Now())
+	c, push := withClient(t, clk)
 
 	handler, err := New(ctx, "", test.Logger(t))
 	if err != nil {
