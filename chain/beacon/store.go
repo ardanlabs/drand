@@ -36,10 +36,9 @@ type appendStore struct {
 	chain.Store
 	last *chain.Beacon
 	sync.Mutex
-	isChained bool
 }
 
-func newAppendStore(s chain.Store, sch *crypto.Scheme) (chain.Store, error) {
+func newAppendStore(s chain.Store) (chain.Store, error) {
 	last, err := s.Last(context.Background())
 	if err != nil {
 		return nil, err
@@ -47,7 +46,6 @@ func newAppendStore(s chain.Store, sch *crypto.Scheme) (chain.Store, error) {
 	return &appendStore{
 		Store:     s,
 		last:      last,
-		isChained: sch.Name == crypto.DefaultSchemeID,
 	}, nil
 }
 
@@ -60,10 +58,6 @@ func (a *appendStore) Put(ctx context.Context, b *chain.Beacon) error {
 
 	if b.Round == a.last.Round {
 		if bytes.Equal(a.last.Signature, b.Signature) {
-			if !a.isChained {
-				return fmt.Errorf("%w round %d", ErrBeaconAlreadyStored, b.Round)
-			}
-
 			if bytes.Equal(a.last.PreviousSig, b.PreviousSig) {
 				return fmt.Errorf("%w round %d", ErrBeaconAlreadyStored, b.Round)
 			}
