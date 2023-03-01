@@ -44,8 +44,8 @@ func newAppendStore(s chain.Store) (chain.Store, error) {
 		return nil, err
 	}
 	return &appendStore{
-		Store:     s,
-		last:      last,
+		Store: s,
+		last:  last,
 	}, nil
 }
 
