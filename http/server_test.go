@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"runtime"
 	"testing"
 	"time"
 
@@ -45,6 +46,7 @@ func getWithCtx(ctx context.Context, url string, t *testing.T) *http.Response {
 
 //nolint:funlen
 func TestHTTPRelay(t *testing.T) {
+	t.Logf("runtime.GOMAXPROCS(0) == %d\n", runtime.GOMAXPROCS(0))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -149,6 +151,7 @@ func validateEndpoint(endpoint string, round float64) error {
 }
 
 func TestHTTPWaiting(t *testing.T) {
+	t.Logf("runtime.GOMAXPROCS(0) == %d\n", runtime.GOMAXPROCS(0))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c, push := withClient(t)
@@ -219,6 +222,7 @@ func TestHTTPWaiting(t *testing.T) {
 }
 
 func TestHTTPWatchFuture(t *testing.T) {
+	t.Logf("runtime.GOMAXPROCS(0) == %d\n", runtime.GOMAXPROCS(0))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c, _ := withClient(t)
@@ -255,6 +259,7 @@ func TestHTTPWatchFuture(t *testing.T) {
 }
 
 func TestHTTPHealth(t *testing.T) {
+	t.Logf("runtime.GOMAXPROCS(0) == %d\n", runtime.GOMAXPROCS(0))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c, push := withClient(t)
