@@ -68,7 +68,7 @@ jobs:
           DRAND_TEST_LOGS: "${{ runner.debug == '1' && 'DEBUG' || 'INFO' }}"
           SCHEME_ID: ${{ matrix.scheme_id }}
           CI: "true"
-          CGO_ENABLED: 0
+          CGO_ENABLED: 1
         run: make test-unit-${{ matrix.db_type }}
 
   test-integration:
@@ -99,7 +99,7 @@ jobs:
           DRAND_TEST_LOGS: "${{ runner.debug == '1' && 'DEBUG' || 'INFO' }}"
           SCHEME_ID: ${{ matrix.scheme_id }}
           CI: "true"
-          CGO_ENABLED: 0
+          CGO_ENABLED: 1
         run: make test-integration-${{ matrix.db_type }}
 
   test-integration-run-demo:
@@ -130,7 +130,7 @@ jobs:
           DRAND_TEST_LOGS: "${{ runner.debug == '1' && 'DEBUG' || 'INFO' }}"
           SCHEME_ID: ${{ matrix.scheme_id }}
           CI: "true"
-          CGO_ENABLED: 0
+          CGO_ENABLED: 1
         run: make test-integration-run-demo-${{ matrix.db_type }}
 
   coverage:
@@ -162,5 +162,5 @@ jobs:
           DRAND_TEST_LOGS: "${{ runner.debug == '1' && 'DEBUG' || 'INFO' }}"
           SCHEME_ID: ${{ matrix.scheme_id }}
           CI: "true"
-          CGO_ENABLED: 0
+          CGO_ENABLED: 1
       - run: bash <(curl -s https://codecov.io/bash)
