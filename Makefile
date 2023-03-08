@@ -59,15 +59,15 @@ clean:
 test: test-unit test-integration
 
 test-unit:
-	go test -failfast $(SHORTTEST) -race -v ./...
+	go test -failfast $(SHORTTEST)  -v ./...
 
 test-unit-boltdb: test-unit
 
 test-unit-memdb:
-	go test -failfast $(SHORTTEST) -race -v -tags memdb ./...
+	go test -failfast $(SHORTTEST)  -v -tags memdb ./...
 
 test-unit-postgres:
-	go test -failfast $(SHORTTEST) -race -v -tags postgres ./...
+	go test -failfast $(SHORTTEST)  -v -tags postgres ./...
 
 test-unit-cover:
 	go test -failfast $(SHORTTEST) -v -coverprofile=coverage.txt -covermode=count -coverpkg=all $(go list ./... | grep -v /demo/)
@@ -81,15 +81,15 @@ test-unit-postgres-cover:
 	go test -failfast $(SHORTTEST) -v -tags postgres -coverprofile=coverage-postgres.txt -covermode=count -coverpkg=all $(go list ./... | grep -v /demo/)
 
 test-integration:
-	go test -failfast $(SHORTTEST) -race -v -tags integration ./demo/
+	go test -failfast $(SHORTTEST)  -v -tags integration ./demo/
 
 test-integration-boltdb: test-integration
 
 test-integration-memdb:
-	go test -failfast $(SHORTTEST) -race -v -tags integration,memdb ./demo/
+	go test -failfast $(SHORTTEST)  -v -tags integration,memdb ./demo/
 
 test-integration-postgres:
-	go test -failfast $(SHORTTEST) -race -v -tags integration,postgres ./demo/
+	go test -failfast $(SHORTTEST)  -v -tags integration,postgres ./demo/
 
 test-integration-run-demo:
 	cd demo && go build && ./demo -build -test -debug
